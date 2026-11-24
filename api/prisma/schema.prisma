@@ -1,0 +1,948 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum InvitePolicy {
+  EVERYONE
+  NOBODY
+}
+
+enum FinancialStage {
+  SURVIVAL
+  DEBT_RECOVERY
+  BUILD_SAFETY_NET
+  STABLE
+  GROWING
+}
+
+enum SpaceType {
+  PERSONAL
+  COUPLE
+  FAMILY
+  CUSTOM
+}
+
+enum SpaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+enum WalletType {
+  CASH
+  BANK
+  EWALLET
+  CREDIT_CARD
+  PAYLATER
+  SAVINGS
+  INVESTMENT
+  OTHER
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum Visibility {
+  SHARED
+  PRIVATE
+}
+
+enum SpendingMood {
+  HAPPY
+  NEUTRAL
+  STRESSED
+  BORED
+  SAD
+  CELEBRATING
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  PAUSED
+  CANCELLED
+}
+
+enum DebtType {
+  DEBT
+  RECEIVABLE
+}
+
+enum DebtStatus {
+  ACTIVE
+  PAID
+  OVERDUE
+  FORGIVEN
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum ChallengeType {
+  NO_SPEND_DAY
+  WEEK_52_SAVING
+  CATEGORY_LIMIT
+  CUSTOM
+}
+
+enum ChallengeStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum InsightType {
+  OVERSPENDING
+  SAVING_TIP
+  BILL_REMINDER
+  DEBT_ADVICE
+  GOAL_PROGRESS
+  UNUSUAL_TRANSACTION
+  MONTHLY_SUMMARY
+}
+
+enum InsightSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+enum NotificationType {
+  INVITATION_RECEIVED
+  INVITATION_ACCEPTED
+  INVITATION_DECLINED
+  BUDGET_ALERT
+  BILL_DUE
+  DEBT_DUE
+  GOAL_ACHIEVED
+  SETTLEMENT_REQUEST
+  SETTLEMENT_CONFIRMED
+  SYSTEM
+}
+
+enum WidgetType {
+  BALANCE_OVERVIEW
+  CASHFLOW_CHART
+  EXPENSE_BY_CATEGORY
+  BUDGET_PROGRESS
+  UPCOMING_BILLS
+  SAVINGS_GOALS
+  DEBT_TRACKER
+  RECENT_TRANSACTIONS
+  HEALTH_SCORE
+  SAFE_TO_SPEND
+  PARTNER_SPLIT
+  CHALLENGES
+  INSIGHTS
+}
+
+enum ImportSource {
+  CSV
+  EXCEL
+  BANK_STATEMENT
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  NEEDS_REVIEW
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  status        UserStatus @default(ACTIVE)
+
+  username            String    @unique
+  usernameChangeCount Int       @default(0)
+  usernameChangedAt   DateTime?
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  profile             UserProfile?
+  sessions            Session[]
+  usernameHistory     UsernameHistory[]
+  passwordResets      PasswordResetToken[]
+  memberships         SpaceMember[]
+  sentInvitations     Invitation[]          @relation("InvitationInviter")
+  receivedInvitations Invitation[]          @relation("InvitationInvitee")
+  createdSpaces       Space[]               @relation("SpaceCreator")
+  ownedWallets        Wallet[]
+  transactions        Transaction[]
+  splits              TransactionSplit[]
+  settlementsSent     Settlement[]          @relation("SettlementFrom")
+  settlementsReceived Settlement[]          @relation("SettlementTo")
+  goalContributions   GoalContribution[]
+  debtsCreated        Debt[]                @relation("DebtCreator")
+  debtsAsCounterparty Debt[]                @relation("DebtCounterpartyUser")
+  recurrings          RecurringTransaction[]
+  challengesCreated   Challenge[]
+  challengeCheckIns   ChallengeCheckIn[]
+  notifications       Notification[]
+  dashboardLayouts    DashboardLayout[]
+  insights            Insight[]
+  snapshots           FinancialSnapshot[]
+  activityLogs        ActivityLog[]
+  blocksMade          UserBlock[]           @relation("BlocksMade")
+  blocksReceived      UserBlock[]           @relation("BlocksReceived")
+  comments            TransactionComment[]
+  importJobs          ImportJob[]
+
+  @@index([status])
+  @@map("users")
+}
+
+model UserProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName    String?
+  displayName String?
+  avatarUrl   String?
+  bio         String?
+  phone       String?
+  birthDate   DateTime?
+  occupation  String?
+  country     String    @default("ID")
+  timezone    String    @default("Asia/Jakarta")
+  locale      String    @default("id-ID")
+
+  defaultCurrency String         @default("IDR")
+  paydayDay       Int            @default(1)
+  monthlyIncome   Decimal?       @db.Decimal(18, 2)
+  financialStage  FinancialStage @default(STABLE)
+
+  searchableByUsername Boolean      @default(true)
+  invitePolicy         InvitePolicy @default(EVERYONE)
+
+  preferences    Json?
+  onboardingDone Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model UsernameHistory {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oldUsername   String
+  newUsername   String
+  changedAt     DateTime @default(now())
+  reservedUntil DateTime
+
+  @@index([oldUsername, reservedUntil])
+  @@index([userId])
+  @@map("username_history")
+}
+
+model ReservedUsername {
+  username String  @id
+  reason   String?
+
+  @@map("reserved_usernames")
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+  deviceName String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  blocker User @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+model Space {
+  id          String    @id @default(cuid())
+  name        String
+  type        SpaceType @default(PERSONAL)
+  description String?
+  emoji       String?
+  currency    String    @default("IDR")
+  createdById String
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  createdBy    User                   @relation("SpaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members      SpaceMember[]
+  invitations  Invitation[]
+  wallets      Wallet[]
+  categories   Category[]
+  tags         Tag[]
+  transactions Transaction[]
+  recurrings   RecurringTransaction[]
+  budgets      Budget[]
+  goals        SavingsGoal[]
+  debts        Debt[]
+  settlements  Settlement[]
+  challenges   Challenge[]
+  snapshots    FinancialSnapshot[]
+  insights     Insight[]
+  layouts      DashboardLayout[]
+  activityLogs ActivityLog[]
+  importJobs   ImportJob[]
+
+  @@index([createdById])
+  @@map("spaces")
+}
+
+model SpaceMember {
+  id       String    @id @default(cuid())
+  spaceId  String
+  userId   String
+  role     SpaceRole @default(MEMBER)
+  nickname String?
+
+  defaultSharePercent Decimal  @default(50) @db.Decimal(5, 2)
+  monthlyContribution Decimal? @db.Decimal(18, 2)
+
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@map("space_members")
+}
+
+model Invitation {
+  id              String           @id @default(cuid())
+  spaceId         String
+  inviterId       String
+  inviteeId       String
+  inviteeUsername String
+  role            SpaceRole        @default(MEMBER)
+  status          InvitationStatus @default(PENDING)
+  message         String?
+  expiresAt       DateTime
+  respondedAt     DateTime?
+  createdAt       DateTime         @default(now())
+
+  space   Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  inviter User  @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User  @relation("InvitationInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, inviteeId, status])
+  @@index([inviteeId, status])
+  @@map("invitations")
+}
+
+model Wallet {
+  id       String     @id @default(cuid())
+  spaceId  String
+  ownerId  String?
+  name     String
+  type     WalletType @default(CASH)
+  currency String     @default("IDR")
+
+  initialBalance Decimal  @default(0) @db.Decimal(18, 2)
+  creditLimit    Decimal? @db.Decimal(18, 2)
+  billingDay     Int?
+  dueDay         Int?
+
+  institution    String?
+  accountLast4   String?
+  color          String?
+  icon           String?
+  includeInTotal Boolean @default(true)
+  isArchived     Boolean @default(false)
+  sortOrder      Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space        Space                  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  owner        User?                  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  transactions Transaction[]          @relation("TxWallet")
+  transfersIn  Transaction[]          @relation("TxToWallet")
+  recurrings   RecurringTransaction[]
+  goals        SavingsGoal[]
+  importJobs   ImportJob[]
+
+  @@index([spaceId])
+  @@index([ownerId])
+  @@map("wallets")
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  spaceId     String
+  name        String
+  type        CategoryType
+  icon        String?
+  color       String?
+  isEssential Boolean      @default(false)
+  isArchived  Boolean      @default(false)
+  sortOrder   Int          @default(0)
+
+  space        Space                  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  recurrings   RecurringTransaction[]
+  budgets      Budget[]
+
+  @@unique([spaceId, name, type])
+  @@index([spaceId])
+  @@map("categories")
+}
+
+model Tag {
+  id      String  @id @default(cuid())
+  spaceId String
+  name    String
+  color   String?
+
+  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([spaceId, name])
+  @@map("tags")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  spaceId     String
+  walletId    String
+  toWalletId  String?
+  categoryId  String?
+  createdById String
+  type        TransactionType
+
+  amount       Decimal    @db.Decimal(18, 2)
+  fee          Decimal    @default(0) @db.Decimal(18, 2)
+  currency     String     @default("IDR")
+  exchangeRate Decimal?   @db.Decimal(18, 8)
+  title        String
+  note         String?
+  merchant     String?
+  date         DateTime
+  visibility   Visibility @default(SHARED)
+
+  isImpulse Boolean       @default(false)
+  mood      SpendingMood?
+
+  recurringId String?
+  debtId      String?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  space     Space                 @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  wallet    Wallet                @relation("TxWallet", fields: [walletId], references: [id], onDelete: Restrict)
+  toWallet  Wallet?               @relation("TxToWallet", fields: [toWalletId], references: [id], onDelete: Restrict)
+  category  Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User                  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  recurring RecurringTransaction? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  debt      Debt?                 @relation(fields: [debtId], references: [id], onDelete: SetNull)
+
+  tags              Tag[]
+  splits            TransactionSplit[]
+  attachments       Attachment[]
+  debtPayments      DebtPayment[]
+  goalContributions GoalContribution[]
+  comments          TransactionComment[]
+
+  @@index([spaceId, date])
+  @@index([walletId, date])
+  @@index([categoryId])
+  @@index([createdById, date])
+  @@index([spaceId, visibility])
+  @@map("transactions")
+}
+
+model TransactionSplit {
+  id            String  @id @default(cuid())
+  transactionId String
+  userId        String
+  amount        Decimal @db.Decimal(18, 2)
+  isSettled     Boolean @default(false)
+  settlementId  String?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+  settlement  Settlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+
+  @@unique([transactionId, userId])
+  @@index([userId, isSettled])
+  @@map("transaction_splits")
+}
+
+model Settlement {
+  id         String           @id @default(cuid())
+  spaceId    String
+  fromUserId String
+  toUserId   String
+  amount     Decimal          @db.Decimal(18, 2)
+  status     SettlementStatus @default(PENDING)
+  note       String?
+  settledAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  space  Space              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  from   User               @relation("SettlementFrom", fields: [fromUserId], references: [id])
+  to     User               @relation("SettlementTo", fields: [toUserId], references: [id])
+  splits TransactionSplit[]
+
+  @@index([spaceId, status])
+  @@map("settlements")
+}
+
+model TransactionComment {
+  id            String    @id @default(cuid())
+  transactionId String
+  userId        String
+  body          String?
+  reaction      String?
+  createdAt     DateTime  @default(now())
+  editedAt      DateTime?
+  deletedAt     DateTime?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId, createdAt])
+  @@map("transaction_comments")
+}
+
+model Attachment {
+  id            String   @id @default(cuid())
+  transactionId String
+  url           String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  ocrText       String?
+  createdAt     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@map("attachments")
+}
+
+model RecurringTransaction {
+  id               String              @id @default(cuid())
+  spaceId          String
+  walletId         String
+  categoryId       String?
+  createdById      String
+  type             TransactionType
+  title            String
+  amount           Decimal             @db.Decimal(18, 2)
+  frequency        RecurrenceFrequency
+  interval         Int                 @default(1)
+  startDate        DateTime
+  endDate          DateTime?
+  nextRunAt        DateTime
+  isBill           Boolean             @default(false)
+  autoCreate       Boolean             @default(false)
+  remindDaysBefore Int                 @default(3)
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+
+  space     Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  wallet    Wallet        @relation(fields: [walletId], references: [id])
+  category  Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User          @relation(fields: [createdById], references: [id])
+  generated Transaction[]
+
+  @@index([spaceId, nextRunAt])
+  @@index([isActive, nextRunAt])
+  @@map("recurring_transactions")
+}
+
+model Budget {
+  id             String       @id @default(cuid())
+  spaceId        String
+  categoryId     String?
+  name           String
+  amount         Decimal      @db.Decimal(18, 2)
+  period         BudgetPeriod @default(MONTHLY)
+  rollover       Boolean      @default(false)
+  alertThreshold Int          @default(80)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  space    Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, isActive])
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id               String     @id @default(cuid())
+  spaceId          String
+  walletId         String?
+  name             String
+  emoji            String?
+  targetAmount     Decimal    @db.Decimal(18, 2)
+  currentAmount    Decimal    @default(0) @db.Decimal(18, 2)
+  targetDate       DateTime?
+  priority         Int        @default(3)
+  status           GoalStatus @default(ACTIVE)
+  isEmergencyFund  Boolean    @default(false)
+  monthsOfExpenses Int?
+
+  createdAt  DateTime  @default(now())
+  achievedAt DateTime?
+
+  space         Space              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  wallet        Wallet?            @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  contributions GoalContribution[]
+
+  @@index([spaceId, status])
+  @@map("savings_goals")
+}
+
+model GoalContribution {
+  id            String   @id @default(cuid())
+  goalId        String
+  userId        String
+  transactionId String?
+  amount        Decimal  @db.Decimal(18, 2)
+  note          String?
+  date          DateTime @default(now())
+
+  goal        SavingsGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([goalId, date])
+  @@map("goal_contributions")
+}
+
+model Debt {
+  id          String   @id @default(cuid())
+  spaceId     String
+  createdById String
+  type        DebtType
+
+  counterpartyName   String
+  counterpartyUserId String?
+
+  principal         Decimal    @db.Decimal(18, 2)
+  remaining         Decimal    @db.Decimal(18, 2)
+  interestRatePct   Decimal?   @db.Decimal(6, 3)
+  installmentAmount Decimal?   @db.Decimal(18, 2)
+  installmentCount  Int?
+  startDate         DateTime
+  dueDate           DateTime?
+  status            DebtStatus @default(ACTIVE)
+  priority          Int        @default(3)
+  note              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space            Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  createdBy        User          @relation("DebtCreator", fields: [createdById], references: [id])
+  counterpartyUser User?         @relation("DebtCounterpartyUser", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  payments         DebtPayment[]
+  transactions     Transaction[]
+
+  @@index([spaceId, status])
+  @@index([dueDate])
+  @@map("debts")
+}
+
+model DebtPayment {
+  id            String   @id @default(cuid())
+  debtId        String
+  transactionId String?
+  amount        Decimal  @db.Decimal(18, 2)
+  principalPart Decimal  @db.Decimal(18, 2)
+  interestPart  Decimal  @default(0) @db.Decimal(18, 2)
+  paidAt        DateTime @default(now())
+  note          String?
+
+  debt        Debt         @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([debtId, paidAt])
+  @@map("debt_payments")
+}
+
+model Challenge {
+  id           String          @id @default(cuid())
+  spaceId      String
+  createdById  String
+  type         ChallengeType
+  title        String
+  description  String?
+  targetAmount Decimal?        @db.Decimal(18, 2)
+  startDate    DateTime
+  endDate      DateTime
+  status       ChallengeStatus @default(ACTIVE)
+  config       Json?
+  createdAt    DateTime        @default(now())
+
+  space     Space              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  createdBy User               @relation(fields: [createdById], references: [id])
+  checkIns  ChallengeCheckIn[]
+
+  @@index([spaceId, status])
+  @@map("challenges")
+}
+
+model ChallengeCheckIn {
+  id          String   @id @default(cuid())
+  challengeId String
+  userId      String
+  date        DateTime @db.Date
+  success     Boolean  @default(true)
+  amountSaved Decimal? @db.Decimal(18, 2)
+  note        String?
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId, date])
+  @@map("challenge_check_ins")
+}
+
+model FinancialSnapshot {
+  id          String   @id @default(cuid())
+  spaceId     String
+  userId      String?
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+
+  totalIncome    Decimal @db.Decimal(18, 2)
+  totalExpense   Decimal @db.Decimal(18, 2)
+  essentialSpend Decimal @default(0) @db.Decimal(18, 2)
+  impulseSpend   Decimal @default(0) @db.Decimal(18, 2)
+  totalSaved     Decimal @default(0) @db.Decimal(18, 2)
+  totalDebt      Decimal @default(0) @db.Decimal(18, 2)
+  netWorth       Decimal @default(0) @db.Decimal(18, 2)
+
+  savingsRatePct      Decimal? @db.Decimal(6, 2)
+  debtToIncomePct     Decimal? @db.Decimal(6, 2)
+  emergencyFundMonths Decimal? @db.Decimal(6, 2)
+  healthScore         Int?
+  breakdown           Json?
+  createdAt           DateTime @default(now())
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId, periodStart])
+  @@index([spaceId, periodStart])
+  @@map("financial_snapshots")
+}
+
+model Insight {
+  id        String          @id @default(cuid())
+  spaceId   String
+  userId    String?
+  type      InsightType
+  severity  InsightSeverity @default(INFO)
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  expiresAt DateTime?
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, isRead, createdAt])
+  @@map("insights")
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  userId    String
+  spaceId   String
+  name      String   @default("Utama")
+  isDefault Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  space   Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  widgets DashboardWidget[]
+
+  @@unique([userId, spaceId, name])
+  @@map("dashboard_layouts")
+}
+
+model DashboardWidget {
+  id        String     @id @default(cuid())
+  layoutId  String
+  type      WidgetType
+  x         Int        @default(0)
+  y         Int        @default(0)
+  w         Int        @default(4)
+  h         Int        @default(3)
+  isVisible Boolean    @default(true)
+  config    Json?
+
+  layout DashboardLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+
+  @@index([layoutId])
+  @@map("dashboard_widgets")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  actionUrl String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  spaceId    String?
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  space Space? @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([spaceId, createdAt])
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+}
+
+model ImportJob {
+  id           String       @id @default(cuid())
+  spaceId      String
+  walletId     String?
+  userId       String
+  source       ImportSource
+  status       ImportStatus @default(PENDING)
+  fileName     String
+  fileUrl      String
+  columnMap    Json?
+  totalRows    Int          @default(0)
+  importedRows Int          @default(0)
+  skippedRows  Int          @default(0)
+  errors       Json?
+  createdAt    DateTime     @default(now())
+  finishedAt   DateTime?
+
+  space  Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  wallet Wallet? @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, status])
+  @@map("import_jobs")
+}
