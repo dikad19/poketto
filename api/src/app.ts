@@ -11,13 +11,13 @@ import {
 import { walletsRouter, categoriesRouter } from "./routes/wallets";
 import { transactionsRouter } from "./routes/transactions";
 import { dashboardRouter } from "./routes/dashboard";
-
+import { billsRouter } from "./routes/bills";
 export const app = express();
 
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-
+app.use("/spaces/:spaceId/bills", requireAuth, billsRouter);
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 app.use("/auth", authRouter);

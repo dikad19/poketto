@@ -15,7 +15,7 @@ import { Edge, SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, space } from "../lib/theme";
 import { Role, ROLE_LABEL } from "../lib/spaces";
 import { Button } from "./Button";
-
+import type { NativeSyntheticEvent, NativeScrollEvent } from "react-native";
 /* ---------- Dialog helpers (Alert.alert tidak berfungsi di web) ---------- */
 
 export function confirmAction(
@@ -67,6 +67,7 @@ export function Screen({
   onRefresh,
   edges,
   header,
+  onScroll,
 }: {
   children: ReactNode;
   refreshing?: boolean;
@@ -74,12 +75,15 @@ export function Screen({
   edges?: Edge[];
   /** Konten selebar layar di paling atas (tanpa padding), mis. HeroHeader */
   header?: ReactNode;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }) {
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
           onRefresh ? (
             <RefreshControl

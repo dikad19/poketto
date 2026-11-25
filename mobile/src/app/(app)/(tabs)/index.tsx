@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../components/Button";
 import { categoryLabel, WalletGlyph } from "../../../components/CategoryGlyph";
 import {
@@ -10,6 +10,11 @@ import {
   DonutItem,
   TrendPoint,
 } from "../../../components/Charts";
+import {
+  StickyTopBar,
+  TOPBAR_H,
+  TOPBAR_GAP,
+} from "../../../components/StickyTopBar";
 import {
   HeroHeader,
   HeroSummary,
@@ -44,6 +49,8 @@ import { useLoad } from "../../../lib/useLoad";
 import { MonthPicker } from "../../../components/MonthPicker";
 // import { Divider, HeroTopBar, TxRow } from "../../../components/FinanceUI";
 import { invitationsApi } from "../../../lib/spaces"; // gabungkan dengan import hasRole
+import { BillCalendar, type DayTotals } from "../../../components/BillCalendar";
+import { billsApi } from "../../../lib/bills";
 export default function DashboardScreen() {
   const {
     active,
@@ -56,7 +63,7 @@ export default function DashboardScreen() {
   const spaceId = active?.id ?? null;
   const invites = useLoad(() => invitationsApi.inbox().catch(() => []));
   const pending = invites.data?.length ?? 0;
-
+  const scrollY = useRef(new Animated.Value(0)).current;
   const { data, error, loading, refreshing, refresh, retry } = useLoad(
     () =>
       spaceId ? financeApi.dashboard(spaceId, from, to) : Promise.resolve(null),
@@ -82,6 +89,20 @@ export default function DashboardScreen() {
         : Promise.resolve(null),
     [spaceId, offset],
   );
+
+  const bills = useLoad(
+    () => (spaceId ? billsApi.list(spaceId) : Promise.resolve([])),
+    [spaceId],
+  );
+
+  // Total per tanggal untuk titik di kalender (pakai data harian yang sudah ada)
+  const dayTotals: DayTotals = {};
+  for (const p of daily.data?.points ?? []) {
+    dayTotals[keyToDate(p.key).getDate()] = {
+      income: p.income ?? 0,
+      expense: p.expense ?? 0,
+    };
+  }
 
   const trendPoints: TrendPoint[] = (monthly.data?.points ?? []).map((p) => {
     const d = keyToDate(p.key);
@@ -164,149 +185,174 @@ export default function DashboardScreen() {
     });
 
   return (
-    <Screen
-      edges={[]}
-      refreshing={refreshing}
-      onRefresh={() => {
-        monthly.reload();
-        daily.reload();
-        return refresh();
-      }}
-      header={
-        <HeroHeader>
-          <HeroTopBar
-            notificationCount={pending}
-            onNotifications={() => router.push("/invitations")}
-          />
-          <MonthPicker from={from} offset={offset} onChange={setOffset} />
-          {showSkeleton ? (
-            <HeroSummarySkeleton />
-          ) : data ? (
-            <FadeIn key={`${spaceId}-${offset}`}>
-              <HeroSummary
-                currency={currency}
-                totalBalance={data.totalBalance}
-                income={data.income}
-                expense={data.expense}
-                count={data.count}
-                largestExpense={data.largestExpense}
-                avgDaily={avgDaily}
-                prevAvgDaily={prevAvgDaily}
-                daysLeft={daysLeft}
-                isCurrentMonth={offset === 0}
-                periodLabel={monthLabel(from)}
-              />
-            </FadeIn>
-          ) : null}
-        </HeroHeader>
-      }
-    >
-      {showSkeleton ? (
-        <DashboardSkeleton />
-      ) : spacesError && !active ? (
-        <ErrorState message={spacesError} onRetry={reloadSpaces} />
-      ) : !active ? (
-        <EmptyState
-          title="Belum ada space"
-          body="Buat space dari tab Akun untuk mulai mencatat."
-        />
-      ) : error && !data ? (
-        <ErrorState message={error.message} onRetry={retry} />
-      ) : data ? (
-        <FadeIn key={`${spaceId}-${offset}`} style={{ gap: space.md }}>
-          <>
-            {data.wallets.length === 0 ? (
-              <EmptyState
-                title="Belum ada dompet"
-                body="Buat dompet dulu (misalnya Tunai atau rekening bank) supaya bisa mencatat transaksi."
-              >
-                {canAdd ? (
-                  <Button
-                    title="Buat dompet"
-                    onPress={() => router.push("/wallets/new")}
-                  />
-                ) : null}
-              </EmptyState>
-            ) : (
-              <>
-                <SectionTitle>Dompet</SectionTitle>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.walletRow}
-                >
-                  {data.wallets.map((w) => (
-                    <Card key={w.id} style={styles.walletCard}>
-                      <WalletGlyph type={w.type} size={36} />
-                      <Text style={styles.walletName} numberOfLines={1}>
-                        {w.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.walletBalance,
-                          w.balance < 0 && { color: colors.error },
-                        ]}
-                      >
-                        {formatMoney(w.balance, currency)}
-                      </Text>
-                    </Card>
-                  ))}
-                </ScrollView>
-              </>
-            )}
-
-            <InsightCard
-              monthTitle={monthLabel(from)}
-              currency={currency}
-              trend={trendPoints}
-              days={dayPoints}
-              categories={donutItems}
-            />
-
-            <SectionTitle>Transaksi terakhir</SectionTitle>
-            {data.recent.length === 0 ? (
-              <EmptyState
-                title="Belum ada transaksi"
-                body="Ketuk tombol + untuk mencatat yang pertama."
-              >
-                {canAdd && data.wallets.length > 0 ? (
-                  <Button
-                    title="Catat transaksi"
-                    onPress={() => router.push("/add")}
-                  />
-                ) : null}
-              </EmptyState>
-            ) : (
-              <Card style={{ gap: 0, paddingVertical: space.xs }}>
-                {data.recent.map((tx, i) => (
-                  <View key={tx.id}>
-                    {i > 0 ? <Divider /> : null}
-                    <TxRow
-                      tx={tx}
-                      currency={currency}
-                      showAuthor={showAuthor}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/transactions/[transactionId]",
-                          params: { transactionId: tx.id },
-                        })
-                      }
-                    />
-                  </View>
-                ))}
-              </Card>
-            )}
-            {data.recent.length > 0 ? (
-              <Button
-                title="Lihat semua transaksi"
-                variant="secondary"
-                onPress={() => router.navigate("/transactions")}
-              />
+    <View style={{ flex: 1 }}>
+      <Screen
+        edges={[]}
+        refreshing={refreshing}
+        onRefresh={() => {
+          monthly.reload();
+          daily.reload();
+          return refresh();
+        }}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
+        header={
+          <HeroHeader>
+            <View style={{ height: TOPBAR_H + TOPBAR_GAP }} />
+            <MonthPicker from={from} offset={offset} onChange={setOffset} />
+            {showSkeleton ? (
+              <HeroSummarySkeleton />
+            ) : data ? (
+              <FadeIn key={`${spaceId}-${offset}`}>
+                <HeroSummary
+                  currency={currency}
+                  totalBalance={data.totalBalance}
+                  income={data.income}
+                  expense={data.expense}
+                  count={data.count}
+                  largestExpense={data.largestExpense}
+                  avgDaily={avgDaily}
+                  prevAvgDaily={prevAvgDaily}
+                  daysLeft={daysLeft}
+                  isCurrentMonth={offset === 0}
+                  periodLabel={monthLabel(from)}
+                />
+              </FadeIn>
             ) : null}
-          </>
-        </FadeIn>
-      ) : null}
-    </Screen>
+          </HeroHeader>
+        }
+      >
+        {showSkeleton ? (
+          <DashboardSkeleton />
+        ) : spacesError && !active ? (
+          <ErrorState message={spacesError} onRetry={reloadSpaces} />
+        ) : !active ? (
+          <EmptyState
+            title="Belum ada space"
+            body="Buat space dari tab Akun untuk mulai mencatat."
+          />
+        ) : error && !data ? (
+          <ErrorState message={error.message} onRetry={retry} />
+        ) : data ? (
+          <FadeIn key={`${spaceId}-${offset}`} style={{ gap: space.md }}>
+            <>
+              {active ? (
+                <BillCalendar
+                  spaceId={active.id}
+                  month={from}
+                  currency={currency}
+                  dayTotals={dayTotals}
+                  bills={bills.data ?? []}
+                  wallets={data.wallets.map((w) => ({
+                    id: w.id,
+                    name: w.name,
+                  }))}
+                  canEdit={canAdd}
+                  onChanged={bills.reload}
+                />
+              ) : null}
+              {data.wallets.length === 0 ? (
+                <EmptyState
+                  title="Belum ada dompet"
+                  body="Buat dompet dulu (misalnya Tunai atau rekening bank) supaya bisa mencatat transaksi."
+                >
+                  {canAdd ? (
+                    <Button
+                      title="Buat dompet"
+                      onPress={() => router.push("/wallets/new")}
+                    />
+                  ) : null}
+                </EmptyState>
+              ) : (
+                <>
+                  <SectionTitle>Dompet</SectionTitle>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.walletRow}
+                  >
+                    {data.wallets.map((w) => (
+                      <Card key={w.id} style={styles.walletCard}>
+                        <WalletGlyph type={w.type} size={36} />
+                        <Text style={styles.walletName} numberOfLines={1}>
+                          {w.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.walletBalance,
+                            w.balance < 0 && { color: colors.error },
+                          ]}
+                        >
+                          {formatMoney(w.balance, currency)}
+                        </Text>
+                      </Card>
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+
+              <InsightCard
+                monthTitle={monthLabel(from)}
+                currency={currency}
+                trend={trendPoints}
+                days={dayPoints}
+                categories={donutItems}
+              />
+
+              <SectionTitle>Transaksi terakhir</SectionTitle>
+              {data.recent.length === 0 ? (
+                <EmptyState
+                  title="Belum ada transaksi"
+                  body="Ketuk tombol + untuk mencatat yang pertama."
+                >
+                  {canAdd && data.wallets.length > 0 ? (
+                    <Button
+                      title="Catat transaksi"
+                      onPress={() => router.push("/add")}
+                    />
+                  ) : null}
+                </EmptyState>
+              ) : (
+                <Card style={{ gap: 0, paddingVertical: space.xs }}>
+                  {data.recent.map((tx, i) => (
+                    <View key={tx.id}>
+                      {i > 0 ? <Divider /> : null}
+                      <TxRow
+                        tx={tx}
+                        currency={currency}
+                        showAuthor={showAuthor}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/transactions/[transactionId]",
+                            params: { transactionId: tx.id },
+                          })
+                        }
+                      />
+                    </View>
+                  ))}
+                </Card>
+              )}
+              {data.recent.length > 0 ? (
+                <Button
+                  title="Lihat semua transaksi"
+                  variant="secondary"
+                  onPress={() => router.navigate("/transactions")}
+                />
+              ) : null}
+            </>
+          </FadeIn>
+        ) : null}
+      </Screen>
+
+      <StickyTopBar scrollY={scrollY}>
+        <HeroTopBar
+          notificationCount={pending}
+          onNotifications={() => router.push("/invitations")}
+        />
+      </StickyTopBar>
+    </View>
   );
 }
 

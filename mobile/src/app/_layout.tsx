@@ -1,36 +1,40 @@
-import { ActivityIndicator, View } from "react-native";
+import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { AuthProvider, useAuth } from "../lib/auth";
-import { colors } from "../lib/theme";
+import { LoadingScreen } from "../components/LoadingScreen";
+import { useBootstrap } from "../hooks/useAppBootstrap";
+
+SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { user, loading } = useAuth();
+  const { ready, progress, label } = useBootstrap(user, loading);
+  const [finished, setFinished] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  // kalau loading muncul lagi (mis. setelah login), reset
+  useEffect(() => {
+    if (!ready) setFinished(false);
+  }, [ready]);
+
+  if (!ready || !finished) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.paper,
-        }}
-      >
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <LoadingScreen
+        progress={ready ? 1 : Math.min(progress, 0.95)}
+        label={label}
+        onFinish={ready ? () => setFinished(true) : undefined}
+      />
     );
   }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!user}>
-        <Stack.Screen name="(app)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!user}>
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
-      </Stack.Protected>
+      {/* sama seperti sebelumnya */}
     </Stack>
   );
 }

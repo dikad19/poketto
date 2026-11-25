@@ -22,7 +22,6 @@ import {
 } from "react-native";
 import { BottomSheet } from "./BottomSheet";
 /* ---------- Baris transaksi ---------- */
-
 export function TxRow({
   tx,
   currency,
@@ -392,7 +391,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   topActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   side: { flex: 1, flexDirection: "row" },

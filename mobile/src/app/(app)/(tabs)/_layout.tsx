@@ -60,21 +60,13 @@ function TabItem({
       accessibilityState={{ selected: focused }}
       accessibilityLabel={label}
     >
-      <View style={styles.iconBox}>
-        <Animated.View style={[styles.iconLayer, outlineStyle]}>
-          <MaterialCommunityIcons
-            name={icons[1]}
-            size={26}
-            color={colors.placeholder}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.iconLayer, filledStyle]}>
-          <MaterialCommunityIcons
-            name={icons[0]}
-            size={26}
-            color={colors.primary}
-          />
-        </Animated.View>
+      <View style={styles.iconBox} collapsable={false}>
+        <MaterialCommunityIcons
+          name={focused ? icons[0] : icons[1]}
+          size={26}
+          color={focused ? colors.primary : colors.placeholder}
+          style={styles.iconGlyph}
+        />
       </View>
     </Pressable>
   );
@@ -184,13 +176,17 @@ const styles = StyleSheet.create({
   row: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
   },
   item: {
     flex: 1,
-    height: "100%",
     alignItems: "center",
     justifyContent: "center",
+  },
+  iconGlyph: {
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    lineHeight: 26,
   },
   iconBox: {
     width: 40,

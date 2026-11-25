@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCompact, formatMoney } from "../lib/format";
@@ -41,31 +41,51 @@ const GLOWS = [
 
 export function HeroHeader({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const [size, setSize] = useState({ w: 0, h: 0 });
 
   return (
-    <View style={styles.shell}>
-      <Svg
-        style={StyleSheet.absoluteFill}
-        width="100%"
-        height="100%"
-        preserveAspectRatio="none"
-        pointerEvents="none"
-      >
-        <Defs>
-          <LinearGradient id="heroBg" x1="0" y1="0" x2="0.7" y2="1">
-            <Stop offset="0" stopColor="#B03A5B" />
-            <Stop offset="0.5" stopColor="#7A1D3A" />
-            <Stop offset="1" stopColor="#3A0B1C" />
-          </LinearGradient>
+    <View
+      style={styles.shell}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize({ w: width, h: height });
+      }}
+    >
+      {size.w > 0 ? (
+        <Svg
+          style={StyleSheet.absoluteFill}
+          width={size.w}
+          height={size.h}
+          pointerEvents="none"
+        >
+          <Defs>
+            <LinearGradient id="heroBg" x1="0" y1="0" x2="0.7" y2="1">
+              <Stop offset="0" stopColor="#B03A5B" />
+              <Stop offset="0.5" stopColor="#7A1D3A" />
+              <Stop offset="1" stopColor="#3A0B1C" />
+            </LinearGradient>
 
-          <RadialGradient id="heroGlow" cx="0.15" cy="0.05" r="0.7">
-            <Stop offset="0" stopColor="#f16384" stopOpacity={0.22} />
-            <Stop offset="1" stopColor="#f16384" stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroBg)" />
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroGlow)" />
-      </Svg>
+            <RadialGradient id="heroGlow" cx="0.15" cy="0.05" r="0.7">
+              <Stop offset="0" stopColor="#f16384" stopOpacity={0.22} />
+              <Stop offset="1" stopColor="#f16384" stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width={size.w}
+            height={size.h}
+            fill="url(#heroBg)"
+          />
+          <Rect
+            x="0"
+            y="0"
+            width={size.w}
+            height={size.h}
+            fill="url(#heroGlow)"
+          />
+        </Svg>
+      ) : null}
 
       <View style={[styles.inner, { paddingTop: insets.top + space.md }]}>
         {children}
@@ -250,13 +270,13 @@ const styles = StyleSheet.create({
   shell: {
     width: "100%",
     overflow: "hidden",
-    backgroundColor: colors.primary,
+    backgroundColor: "#7A1D3A",
   },
   inner: {
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
-    paddingHorizontal: space.md,
+    paddingHorizontal: 10,
     paddingBottom: space.xl + SHEET_OVERLAP,
     gap: space.sm,
   },
