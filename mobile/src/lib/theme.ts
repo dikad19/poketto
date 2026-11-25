@@ -1,14 +1,14 @@
 export const colors = {
-  primary: "#1F3A5F",
-  primaryPressed: "#162B47",
-  coin: "#F5B335",
-  ink: "#101828",
-  muted: "#5B6577",
-  placeholder: "#8A94A6",
-  paper: "#F7F8FA",
+  primary: "#8E2043", // burgundy
+  primaryPressed: "#6F1833", // burgundy lebih gelap saat ditekan
+  coin: "#F5B335", // emas, kontras bagus dengan burgundy
+  ink: "#2A1218",
+  muted: "#7A5C64",
+  placeholder: "#A8909A",
+  paper: "#fffbfb", // blush
   surface: "#FFFFFF",
-  line: "#D0D5DD",
-  error: "#B42318",
+  line: "#EBD7DC",
+  error: "#D92D20", // merah terang, beda dari burgundy
   errorBg: "#FEF3F2",
   errorLine: "#FDA29B",
 };

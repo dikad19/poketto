@@ -88,9 +88,21 @@ export function Glyph({
 }) {
   return (
     <View
-      style={[styles.box, { width: size, height: size, borderRadius: size / 3, backgroundColor: bg }]}
+      style={[
+        styles.box,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 3,
+          backgroundColor: bg,
+        },
+      ]}
     >
-      <MaterialCommunityIcons name={name as IconName} size={size * 0.5} color={tint} />
+      <MaterialCommunityIcons
+        name={name as IconName}
+        size={size * 0.5}
+        color={tint}
+      />
     </View>
   );
 }
@@ -99,11 +111,23 @@ export function Glyph({
 export const CategoryIconName = (icon?: string | null) =>
   (icon && CATEGORY_ICON[icon]) || "tag-outline";
 
-export function CategoryGlyph({ icon, size }: { icon?: string | null; size?: number }) {
+export function CategoryGlyph({
+  icon,
+  size,
+}: {
+  icon?: string | null;
+  size?: number;
+}) {
   return <Glyph name={CategoryIconName(icon)} size={size} />;
 }
 
-export function WalletGlyph({ type, size }: { type: WalletType; size?: number }) {
+export function WalletGlyph({
+  type,
+  size,
+}: {
+  type: WalletType;
+  size?: number;
+}) {
   return <Glyph name={WALLET_ICON[type] ?? "wallet-outline"} size={size} />;
 }
 

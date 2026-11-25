@@ -63,7 +63,12 @@ export type Tx = {
   createdAt: string;
   wallet: { id: string; name: string };
   toWallet: { id: string; name: string } | null;
-  category: { id: string; name: string; icon: string | null; type: string } | null;
+  category: {
+    id: string;
+    name: string;
+    icon: string | null;
+    type: string;
+  } | null;
   createdBy: { id: string; username: string; name: string | null };
 };
 
@@ -74,6 +79,8 @@ export type Dashboard = {
   income: number;
   expense: number;
   net: number;
+  count: number;
+  largestExpense: { amount: number; title: string } | null;
   byCategory: {
     categoryId: string | null;
     name: string;
@@ -84,6 +91,9 @@ export type Dashboard = {
   wallets: Wallet[];
   recent: Tx[];
 };
+
+export type SeriesPoint = { key: string; income: number; expense: number };
+export type Series = { bucket: "day" | "month"; points: SeriesPoint[] };
 
 export type TxPage = { items: Tx[]; nextCursor: string | null };
 
@@ -116,12 +126,28 @@ function qs(params: Record<string, string | number | undefined | null>) {
 export const financeApi = {
   dashboard: (spaceId: string, from: Date, to: Date) =>
     api<Dashboard>(
-      `/spaces/${spaceId}/dashboard${qs({ from: from.toISOString(), to: to.toISOString() })}`
+      `/spaces/${spaceId}/dashboard${qs({ from: from.toISOString(), to: to.toISOString() })}`,
+    ),
+
+  series: (spaceId: string, from: Date, to: Date, bucket: "day" | "month") =>
+    api<Series>(
+      `/spaces/${spaceId}/dashboard/series${qs({
+        from: from.toISOString(),
+        to: to.toISOString(),
+        bucket,
+        tzOffset: new Date().getTimezoneOffset(),
+      })}`,
     ),
 
   transactions: (
     spaceId: string,
-    p: { from: Date; to: Date; type?: TxType; cursor?: string | null; limit?: number }
+    p: {
+      from: Date;
+      to: Date;
+      type?: TxType;
+      cursor?: string | null;
+      limit?: number;
+    },
   ) =>
     api<TxPage>(
       `/spaces/${spaceId}/transactions${qs({
@@ -130,9 +156,10 @@ export const financeApi = {
         type: p.type,
         cursor: p.cursor,
         limit: p.limit ?? 30,
-      })}`
+      })}`,
     ),
-  transaction: (spaceId: string, id: string) => api<Tx>(`/spaces/${spaceId}/transactions/${id}`),
+  transaction: (spaceId: string, id: string) =>
+    api<Tx>(`/spaces/${spaceId}/transactions/${id}`),
   createTransaction: (spaceId: string, body: CreateTxInput) =>
     api<Tx>(`/spaces/${spaceId}/transactions`, { method: "POST", body }),
   deleteTransaction: (spaceId: string, id: string) =>
@@ -144,5 +171,6 @@ export const financeApi = {
   archiveWallet: (spaceId: string, id: string) =>
     api(`/spaces/${spaceId}/wallets/${id}`, { method: "DELETE" }),
 
-  categories: (spaceId: string) => api<Category[]>(`/spaces/${spaceId}/categories`),
+  categories: (spaceId: string) =>
+    api<Category[]>(`/spaces/${spaceId}/categories`),
 };

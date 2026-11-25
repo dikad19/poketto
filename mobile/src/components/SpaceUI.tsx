@@ -53,6 +53,9 @@ export function showMessage(title: string, message: string) {
 
 /* ---------- Layout ---------- */
 
+/** Seberapa jauh lembar konten menimpa `header` (px). HeroHeader memakai ini untuk padding bawahnya. */
+export const SHEET_OVERLAP = 30;
+
 export function goBack() {
   if (router.canGoBack()) router.back();
   else router.replace("/");
@@ -63,11 +66,14 @@ export function Screen({
   refreshing,
   onRefresh,
   edges,
+  header,
 }: {
   children: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   edges?: Edge[];
+  /** Konten selebar layar di paling atas (tanpa padding), mis. HeroHeader */
+  header?: ReactNode;
 }) {
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
@@ -79,12 +85,20 @@ export function Screen({
             <RefreshControl
               refreshing={!!refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={header ? "#FFFFFF" : colors.primary}
             />
           ) : undefined
         }
       >
-        <View style={styles.column}>{children}</View>
+        {header}
+        {header ? (
+          // Lembar konten: sudut atas melengkung ke atas dan menimpa bagian bawah header
+          <View style={styles.sheet}>
+            <View style={styles.column}>{children}</View>
+          </View>
+        ) : (
+          <View style={styles.column}>{children}</View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -340,8 +354,22 @@ export function ChoiceRow<T extends string>({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
-  scroll: { padding: space.lg, paddingBottom: space.xl * 2 },
-  column: { width: "100%", maxWidth: 560, alignSelf: "center", gap: space.md },
+  // Padding ada di kolom (bukan di ScrollView) supaya `header` bisa menempel penuh
+  scroll: { paddingBottom: space.xl * 2 },
+  sheet: {
+    width: "100%",
+    marginTop: -SHEET_OVERLAP,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.paper,
+  },
+  column: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    gap: space.md,
+    padding: space.lg,
+  },
 
   header: { gap: 4, marginBottom: space.sm },
   back: { alignSelf: "flex-start", paddingVertical: 4, marginBottom: space.sm },
