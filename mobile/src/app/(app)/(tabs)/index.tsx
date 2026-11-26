@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../components/Button";
 import { categoryLabel, WalletGlyph } from "../../../components/CategoryGlyph";
+
 import {
   CHART,
   DayPoint,
@@ -39,6 +40,8 @@ import {
   monthRange,
   shortMonth,
 } from "../../../lib/format";
+import { QuestWidget } from "../../../components/QuestWidget";
+import { useProgress, useQuests } from "../../../lib/progress";
 import { useSmoothLoading } from "../../../lib/useSmoothLoading";
 import { FadeIn } from "../../../components/FadeIn";
 import { DashboardSkeleton } from "../../../components/Skeleton";
@@ -64,6 +67,8 @@ export default function DashboardScreen() {
   const invites = useLoad(() => invitationsApi.inbox().catch(() => []));
   const pending = invites.data?.length ?? 0;
   const scrollY = useRef(new Animated.Value(0)).current;
+  const progress = useProgress();
+  const quests = useQuests();
   const { data, error, loading, refreshing, refresh, retry } = useLoad(
     () =>
       spaceId ? financeApi.dashboard(spaceId, from, to) : Promise.resolve(null),
@@ -188,10 +193,12 @@ export default function DashboardScreen() {
     <View style={{ flex: 1 }}>
       <Screen
         edges={[]}
-        refreshing={refreshing}
+        padH={10}
         onRefresh={() => {
           monthly.reload();
           daily.reload();
+          progress.reload();
+          quests.reload();
           return refresh();
         }}
         onScroll={Animated.event(
@@ -253,6 +260,11 @@ export default function DashboardScreen() {
                   onChanged={bills.reload}
                 />
               ) : null}
+              <QuestWidget
+                progress={progress.data}
+                quests={quests.data}
+                onPress={() => router.push("/progress")}
+              />
               {data.wallets.length === 0 ? (
                 <EmptyState
                   title="Belum ada dompet"
@@ -350,6 +362,8 @@ export default function DashboardScreen() {
         <HeroTopBar
           notificationCount={pending}
           onNotifications={() => router.push("/invitations")}
+          level={progress.data?.level}
+          onAvatarPress={() => router.push("/progress")}
         />
       </StickyTopBar>
     </View>

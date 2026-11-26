@@ -3,7 +3,11 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AVATAR_KEYS } from "../lib/avatars";
-import { getProgressSummary } from "../services/gamification.service";
+import {
+  getExpHistory,
+  getProgressSummary,
+  getQuestStatus,
+} from "../services/gamification.service";
 
 // Mount di app.ts:  app.use("/me", requireAuth, meRouter);
 export const meRouter = Router();
@@ -150,11 +154,9 @@ meRouter.post("/pin", async (req, res) => {
 
   const userId = req.userId!;
   if (await prisma.userSecurity.findUnique({ where: { userId } }))
-    return res
-      .status(409)
-      .json({
-        error: "PIN sudah dibuat. Gunakan reset PIN untuk menggantinya.",
-      });
+    return res.status(409).json({
+      error: "PIN sudah dibuat. Gunakan reset PIN untuk menggantinya.",
+    });
 
   const pinHash = await bcrypt.hash(parsed.data.pin, 12);
   try {
@@ -190,11 +192,9 @@ meRouter.post("/pin/verify", async (req, res) => {
     const mins = Math.ceil(
       (sec.pinLockedUntil.getTime() - Date.now()) / 60_000,
     );
-    return res
-      .status(429)
-      .json({
-        error: `Terlalu banyak percobaan. Coba lagi dalam ${mins} menit`,
-      });
+    return res.status(429).json({
+      error: `Terlalu banyak percobaan. Coba lagi dalam ${mins} menit`,
+    });
   }
 
   if (await bcrypt.compare(parsed.data.pin, sec.pinHash)) {
@@ -293,4 +293,13 @@ meRouter.post("/pin/reset", async (req, res) => {
 /* ------------------------------------------------------------------ */
 meRouter.get("/progress", async (req, res) => {
   res.json(await getProgressSummary(req.userId!));
+});
+
+meRouter.get("/quests", async (req, res) => {
+  res.json(await getQuestStatus(req.userId!));
+});
+
+meRouter.get("/exp-history", async (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+  res.json(await getExpHistory(req.userId!, limit));
 });

@@ -551,6 +551,7 @@ model Transaction {
   @@index([categoryId])
   @@index([createdById, date])
   @@index([spaceId, visibility])
+  @@index([createdById, createdAt])
   @@map("transactions")
 }
 
@@ -966,20 +967,22 @@ model UserSecurity {
 }
 
 enum ExpSource {
-  DAILY_QUEST
+  DAILY_QUEST     // hemat dari kemarin (yang lama)
   MONTHLY_QUEST
+  DAILY_LOG_1     // catat minimal 1 transaksi
+  DAILY_LOG_3     // catat minimal 3 transaksi
+  WEEKLY_LOG      // catat transaksi 5 dari 7 hari
 }
 
 model UserProgress {
   userId         String   @id
   totalExp       Int      @default(0)
-  level          Int      @default(1) // 1..9
-  lastDailyKey   String? // hari terakhir yang sudah dihitung, "YYYY-MM-DD" (waktu lokal user)
-  lastMonthlyKey String? // bulan terakhir yang sudah dihitung, "YYYY-MM"
+  level          Int      @default(1)
+  lastDailyKey   String?
+  lastMonthlyKey String?
+  lastWeeklyKey  String?  // "2026-W47"
   updatedAt      DateTime @updatedAt
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@map("user_progress")
 }
 
@@ -989,8 +992,10 @@ model ExpEvent {
   source        ExpSource
   periodKey     String // "2026-11-25" (daily) atau "2026-10" (monthly)
   exp           Int
-  currentSpend  Decimal   @db.Decimal(18, 2)
-  previousSpend Decimal   @db.Decimal(18, 2)
+   currentSpend  Decimal   @default(0) @db.Decimal(18, 2)
+  previousSpend Decimal   @default(0) @db.Decimal(18, 2)
+  count         Int       @default(0) // jumlah transaksi (harian) atau hari tercatat (mingguan)
+  
   createdAt     DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -68,6 +68,7 @@ export function Screen({
   edges,
   header,
   onScroll,
+  padH,
 }: {
   children: ReactNode;
   refreshing?: boolean;
@@ -76,7 +77,14 @@ export function Screen({
   /** Konten selebar layar di paling atas (tanpa padding), mis. HeroHeader */
   header?: ReactNode;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Padding kiri-kanan kolom konten (default space.lg) */
+  padH?: number;
 }) {
+  const columnStyle = [
+    styles.column,
+    padH !== undefined && { paddingHorizontal: padH },
+  ];
+
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
       <ScrollView
@@ -98,10 +106,10 @@ export function Screen({
         {header ? (
           // Lembar konten: sudut atas melengkung ke atas dan menimpa bagian bawah header
           <View style={styles.sheet}>
-            <View style={styles.column}>{children}</View>
+            <View style={columnStyle}>{children}</View>
           </View>
         ) : (
-          <View style={styles.column}>{children}</View>
+          <View style={columnStyle}>{children}</View>
         )}
       </ScrollView>
     </SafeAreaView>

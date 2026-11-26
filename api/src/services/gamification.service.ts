@@ -6,10 +6,16 @@ import { prisma } from "../lib/prisma";
    Maks/bulan = 30 hari x 5 + 100 = 250 EXP. Level 9 butuh 5500 EXP
    => minimal ~22 bulan kalau SEMPURNA terus. Realistisnya jauh lebih lama.
    ===================================================================== */
-export const DAILY_EXP = 5;
-export const MONTHLY_EXP = 100; // jauh lebih besar dari harian
-const MIN_LOGGED_DAYS_PER_MONTH = 15; // anti-curang: bulan harus cukup tercatat
+export const DAILY_EXP = 5; // hemat dari kemarin
+export const MONTHLY_EXP = 100; // hemat dari bulan lalu
+export const LOG_1_EXP = 2; // catat >= 1 transaksi
+export const LOG_3_EXP = 3; // catat >= 3 transaksi
+export const WEEKLY_LOG_EXP = 15; // catat transaksi >= 5 dari 7 hari
+const WEEKLY_LOG_DAYS = 5;
+const MIN_TX_AMOUNT = 1000; // anti-curang: transaksi di bawah ini tidak dihitung (0 = nonaktif)
+const MIN_LOGGED_DAYS_PER_MONTH = 15;
 const MAX_CATCHUP_DAYS = 62;
+const MAX_CATCHUP_WEEKS = 9;
 const MAX_CATCHUP_MONTHS = 6;
 
 export const LEVELS = [
@@ -53,7 +59,12 @@ const addMonths = (mk: string, n: number) => {
 const monthOf = (key: string) => key.slice(0, 7);
 const monthStart = (mk: string) => `${mk}-01`;
 const monthEnd = (mk: string) => addDays(`${addMonths(mk, 1)}-01`, -1);
-
+// Senin (awal minggu) dari sebuah tanggal "YYYY-MM-DD". Dipakai juga sebagai periodKey mingguan.
+const weekStart = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // Senin = 0
+  return addDays(key, -dow);
+};
 /* =====================================================================
    TOTAL PENGELUARAN PER HARI / BULAN
    - hanya transaksi buatan user, deletedAt null
@@ -100,15 +111,44 @@ async function totals(
   );
 }
 
+/* Jumlah transaksi yang DICATAT per hari (berdasarkan createdAt, bukan tanggal transaksi,
+   supaya tidak bisa diisi dengan transaksi bertanggal mundur). */
+async function loggedPerDay(
+  userId: string,
+  tz: string,
+  fromKey: string,
+  toKey: string,
+) {
+  const local = Prisma.sql`(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}::text)`;
+  const rows = await prisma.$queryRaw<Array<{ day: string; n: number }>>`
+    SELECT to_char(${local}, 'YYYY-MM-DD') AS day, COUNT(*)::int AS n
+    FROM "transactions"
+    WHERE "createdById" = ${userId}
+      AND "deletedAt" IS NULL
+      AND "type" <> 'TRANSFER'
+      AND "amount" * COALESCE("exchangeRate", 1) >= ${MIN_TX_AMOUNT}::numeric
+      AND "createdAt" >= (${fromKey}::date - 2) AND "createdAt" < (${toKey}::date + 3)
+      AND ${local} >= ${fromKey}::date
+      AND ${local} <  (${toKey}::date + 1)
+    GROUP BY 1`;
+  return new Map<string, number>(rows.map((r) => [r.day, r.n]));
+}
+
 /* =====================================================================
    PROSES EXP UNTUK 1 USER (idempotent, aman dipanggil berulang)
    ===================================================================== */
 type NewEvent = {
-  source: "DAILY_QUEST" | "MONTHLY_QUEST";
+  source:
+    | "DAILY_QUEST"
+    | "MONTHLY_QUEST"
+    | "DAILY_LOG_1"
+    | "DAILY_LOG_3"
+    | "WEEKLY_LOG";
   periodKey: string;
   exp: number;
   cur: number;
   prev: number;
+  count: number;
 };
 
 export async function processUserProgress(userId: string, now = new Date()) {
@@ -134,7 +174,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
   });
   const events: NewEvent[] = [];
 
-  /* ---- HARIAN: hari D dihitung setelah D lewat (>= 00:00 hari berikutnya) ---- */
+  /* ---- jendela HARIAN: hari D dihitung setelah D lewat ---- */
   let dFrom = progress.lastDailyKey
     ? addDays(progress.lastDailyKey, 1)
     : addDays(createdDay, 1);
@@ -142,6 +182,35 @@ export async function processUserProgress(userId: string, now = new Date()) {
   if (dFrom < dFloor) dFrom = dFloor;
   const dailyRan = dFrom <= yesterday;
 
+  /* ---- jendela MINGGUAN: minggu (Senin-Minggu) dihitung setelah berakhir ---- */
+  const thisWeek = weekStart(today);
+  const lastWeekDone = addDays(thisWeek, -7);
+  let wFrom = progress.lastWeeklyKey
+    ? addDays(progress.lastWeeklyKey, 7)
+    : addDays(weekStart(createdDay), 7);
+  const wFloor = addDays(thisWeek, -7 * MAX_CATCHUP_WEEKS);
+  if (wFrom < wFloor) wFrom = wFloor;
+  const weeklyRan = wFrom <= lastWeekDone;
+
+  /* ---- jendela BULANAN ---- */
+  const thisMonth = monthOf(today);
+  const lastFinished = addMonths(thisMonth, -1);
+  let mFrom = progress.lastMonthlyKey
+    ? addMonths(progress.lastMonthlyKey, 1)
+    : addMonths(monthOf(createdDay), 1);
+  const mFloor = addMonths(thisMonth, -MAX_CATCHUP_MONTHS);
+  if (mFrom < mFloor) mFrom = mFloor;
+  const monthlyRan = mFrom <= lastFinished;
+
+  // satu query untuk semua quest pencatatan (harian + mingguan)
+  const logFrom = [dailyRan ? dFrom : null, weeklyRan ? wFrom : null]
+    .filter((k): k is string => !!k)
+    .sort()[0];
+  const logs = logFrom
+    ? await loggedPerDay(userId, tz, logFrom, yesterday)
+    : new Map<string, number>();
+
+  /* ---- HARIAN ---- */
   if (dailyRan) {
     const t = await totals(userId, tz, addDays(dFrom, -1), yesterday, "day");
     for (let d = dFrom; d <= yesterday; d = addDays(d, 1)) {
@@ -155,21 +224,49 @@ export async function processUserProgress(userId: string, now = new Date()) {
           exp: DAILY_EXP,
           cur: cur.expense,
           prev: prev.expense,
+          count: 0,
         });
       }
+      const n = logs.get(d) ?? 0;
+      if (n >= 1)
+        events.push({
+          source: "DAILY_LOG_1",
+          periodKey: d,
+          exp: LOG_1_EXP,
+          cur: 0,
+          prev: 0,
+          count: n,
+        });
+      if (n >= 3)
+        events.push({
+          source: "DAILY_LOG_3",
+          periodKey: d,
+          exp: LOG_3_EXP,
+          cur: 0,
+          prev: 0,
+          count: n,
+        });
     }
   }
 
-  /* ---- BULANAN: dihitung tepat setelah pergantian bulan ---- */
-  const thisMonth = monthOf(today);
-  const lastFinished = addMonths(thisMonth, -1);
-  let mFrom = progress.lastMonthlyKey
-    ? addMonths(progress.lastMonthlyKey, 1)
-    : addMonths(monthOf(createdDay), 1);
-  const mFloor = addMonths(thisMonth, -MAX_CATCHUP_MONTHS);
-  if (mFrom < mFloor) mFrom = mFloor;
-  const monthlyRan = mFrom <= lastFinished;
+  /* ---- MINGGUAN ---- */
+  if (weeklyRan) {
+    for (let w = wFrom; w <= lastWeekDone; w = addDays(w, 7)) {
+      let n = 0;
+      for (let i = 0; i < 7; i++) if ((logs.get(addDays(w, i)) ?? 0) > 0) n++;
+      if (n >= WEEKLY_LOG_DAYS)
+        events.push({
+          source: "WEEKLY_LOG",
+          periodKey: w,
+          exp: WEEKLY_LOG_EXP,
+          cur: 0,
+          prev: 0,
+          count: n,
+        });
+    }
+  }
 
+  /* ---- BULANAN ---- */
   if (monthlyRan) {
     const t = await totals(
       userId,
@@ -194,6 +291,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
           exp: MONTHLY_EXP,
           cur: cur.expense,
           prev: prev.expense,
+          count: 0,
         });
       }
     }
@@ -231,6 +329,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
             exp: e.exp,
             currentSpend: e.cur,
             previousSpend: e.prev,
+            count: e.count,
           })),
           skipDuplicates: true,
         });
@@ -245,11 +344,11 @@ export async function processUserProgress(userId: string, now = new Date()) {
           totalExp,
           level,
           ...(dailyRan && { lastDailyKey: yesterday }),
+          ...(weeklyRan && { lastWeeklyKey: lastWeekDone }),
           ...(monthlyRan && { lastMonthlyKey: lastFinished }),
         },
       });
 
-      // pastikan semua badge s/d level saat ini ada (level 1 otomatis)
       await tx.userBadge.createMany({
         data: Array.from({ length: level }, (_, i) => ({
           userId,
@@ -333,4 +432,209 @@ export async function runProgressJob() {
     }
     cursor = users[users.length - 1].id;
   }
+}
+
+/* =====================================================================
+   STATUS QUEST YANG SEDANG BERJALAN (untuk UI)
+   Hari ini & bulan ini masih berjalan, jadi hasilnya SEMENTARA.
+   EXP baru diberikan oleh processUserProgress setelah periodenya lewat.
+   ===================================================================== */
+export type QuestState =
+  | "NO_BASELINE" // pembanding (kemarin / bulan lalu) belum cukup tercatat
+  | "NEEDS_LOG" // belum ada catatan / catatan bulan ini tidak akan cukup
+  | "ON_TRACK" // pengeluaran masih di bawah pembanding
+  | "OVER" // sudah menyamai / melebihi pembanding
+  | "IN_PROGRESS" // quest pencatatan: masih berjalan
+  | "DONE" // quest pencatatan: target sudah tercapai (EXP menyusul saat periode lewat)
+  | "MISSED"; // quest pencatatan: sudah tidak mungkin tercapai
+
+export type QuestId =
+  | "DAILY_SAVE"
+  | "DAILY_LOG_1"
+  | "DAILY_LOG_3"
+  | "WEEKLY_LOG"
+  | "MONTHLY_SAVE";
+
+export type QuestDto = {
+  id: QuestId;
+  type: "DAILY" | "WEEKLY" | "MONTHLY";
+  kind: "SAVE" | "LOG";
+  title: string;
+  subtitle: string;
+  exp: number;
+  state: QuestState;
+  periodKey: string;
+  resolvesOn: string;
+  spent: number; // kind SAVE
+  target: number | null; // kind SAVE
+  progress: number; // kind LOG
+  goal: number; // kind LOG
+  loggedDays?: number; // khusus bulanan
+  requiredDays?: number;
+  daysLeft?: number; // bulanan: sisa hari bulan ini; mingguan: sisa hari minggu ini
+};
+
+export async function getQuestStatus(
+  userId: string,
+  now = new Date(),
+): Promise<QuestDto[]> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profile: { select: { timezone: true } } },
+  });
+  const tz = u?.profile?.timezone ?? "Asia/Jakarta";
+  const today = dayKey(now, tz);
+  const yesterday = addDays(today, -1);
+  const month = monthOf(today);
+  const prevMonth = addMonths(month, -1);
+  const wStart = weekStart(today);
+
+  const [days, months, logs] = await Promise.all([
+    totals(userId, tz, yesterday, today, "day"),
+    totals(userId, tz, monthStart(prevMonth), monthEnd(month), "month"),
+    loggedPerDay(userId, tz, wStart, today),
+  ]);
+
+  /* ---- hemat harian ---- */
+  const dCur = days.get(today);
+  const dPrev = days.get(yesterday);
+  const dSpent = dCur?.expense ?? 0;
+  const dState: QuestState = !dPrev
+    ? "NO_BASELINE"
+    : !dCur
+      ? "NEEDS_LOG"
+      : dSpent < dPrev.expense
+        ? "ON_TRACK"
+        : "OVER";
+
+  /* ---- hemat bulanan ---- */
+  const mCur = months.get(month);
+  const mPrev = months.get(prevMonth);
+  const [y, mo] = month.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  const daysLeft = daysInMonth - Number(today.slice(8, 10)) + 1; // termasuk hari ini
+  const logged = mCur?.days ?? 0;
+  const mSpent = mCur?.expense ?? 0;
+
+  let mState: QuestState;
+  if (!mPrev || mPrev.days < MIN_LOGGED_DAYS_PER_MONTH) mState = "NO_BASELINE";
+  else if (logged + daysLeft < MIN_LOGGED_DAYS_PER_MONTH) mState = "NEEDS_LOG";
+  else if (mSpent >= mPrev.expense) mState = "OVER";
+  else mState = "ON_TRACK";
+
+  /* ---- pencatatan harian ---- */
+  const todayLogs = logs.get(today) ?? 0;
+  const logState = (goal: number): QuestState =>
+    todayLogs >= goal ? "DONE" : "IN_PROGRESS";
+
+  /* ---- pencatatan mingguan ---- */
+  const weekDays = [...logs.values()].filter((n) => n > 0).length;
+  const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const weekDaysLeft = 7 - dow; // termasuk hari ini
+  const wState: QuestState =
+    weekDays >= WEEKLY_LOG_DAYS
+      ? "DONE"
+      : weekDays + weekDaysLeft >= WEEKLY_LOG_DAYS
+        ? "IN_PROGRESS"
+        : "MISSED";
+
+  const base = { spent: 0, target: null, progress: 0, goal: 0 };
+
+  return [
+    {
+      ...base,
+      id: "DAILY_SAVE",
+      type: "DAILY",
+      kind: "SAVE",
+      title: "Hemat Harian",
+      subtitle: "Hemat dari kemarin",
+      exp: DAILY_EXP,
+      state: dState,
+      spent: dSpent,
+      target: dPrev?.expense ?? null,
+      periodKey: today,
+      resolvesOn: addDays(today, 1),
+    },
+    {
+      ...base,
+      id: "DAILY_LOG_1",
+      type: "DAILY",
+      kind: "LOG",
+      title: "Catat Transaksi",
+      subtitle: "Catat minimal 1 transaksi hari ini",
+      exp: LOG_1_EXP,
+      state: logState(1),
+      progress: Math.min(todayLogs, 1),
+      goal: 1,
+      periodKey: today,
+      resolvesOn: addDays(today, 1),
+    },
+    {
+      ...base,
+      id: "DAILY_LOG_3",
+      type: "DAILY",
+      kind: "LOG",
+      title: "Rajin Mencatat",
+      subtitle: "Catat minimal 3 transaksi hari ini",
+      exp: LOG_3_EXP,
+      state: logState(3),
+      progress: Math.min(todayLogs, 3),
+      goal: 3,
+      periodKey: today,
+      resolvesOn: addDays(today, 1),
+    },
+    {
+      ...base,
+      id: "WEEKLY_LOG",
+      type: "WEEKLY",
+      kind: "LOG",
+      title: "Konsisten Seminggu",
+      subtitle: `Catat transaksi ${WEEKLY_LOG_DAYS} dari 7 hari`,
+      exp: WEEKLY_LOG_EXP,
+      state: wState,
+      progress: Math.min(weekDays, WEEKLY_LOG_DAYS),
+      goal: WEEKLY_LOG_DAYS,
+      daysLeft: weekDaysLeft,
+      periodKey: wStart,
+      resolvesOn: addDays(wStart, 7),
+    },
+    {
+      ...base,
+      id: "MONTHLY_SAVE",
+      type: "MONTHLY",
+      kind: "SAVE",
+      title: "Hemat Bulanan",
+      subtitle: "Hemat dari bulan lalu",
+      exp: MONTHLY_EXP,
+      state: mState,
+      spent: mSpent,
+      target: mPrev?.expense ?? null,
+      periodKey: month,
+      resolvesOn: `${addMonths(month, 1)}-01`,
+      loggedDays: logged,
+      requiredDays: MIN_LOGGED_DAYS_PER_MONTH,
+      daysLeft,
+    },
+  ];
+}
+
+/* =====================================================================
+   RIWAYAT EXP
+   ===================================================================== */
+export async function getExpHistory(userId: string, limit = 30) {
+  const rows = await prisma.expEvent.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    source: r.source,
+    periodKey: r.periodKey,
+    exp: r.exp,
+    currentSpend: Number(r.currentSpend),
+    previousSpend: Number(r.previousSpend),
+    count: r.count,
+    createdAt: r.createdAt,
+  }));
 }

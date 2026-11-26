@@ -1,14 +1,18 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { router, Tabs } from "expo-router";
+import { AvatarWithBorder } from "../../../components/AvatarWithBorder";
+import { useAuth } from "../../../lib/auth";
 import { useEffect, type ComponentProps } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { BADGE_IMAGES, levelColor } from "../../../lib/levelAssets";
+import { useProgress } from "../../../lib/progress";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { hasRole } from "../../../lib/spaces";
 import { useSpaces } from "../../../lib/SpaceContext";
@@ -72,6 +76,54 @@ function TabItem({
   );
 }
 
+function AvatarTabItem({
+  label,
+  level,
+  focused,
+  onPress,
+}: {
+  label: string;
+  level?: number;
+  focused: boolean;
+  onPress: () => void;
+}) {
+  const { user } = useAuth();
+  const u = user as {
+    avatarKey?: string | null;
+    avatarUrl?: string | null;
+    name?: string | null;
+    username?: string;
+  } | null;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.item}
+      accessibilityRole="button"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={label}
+    >
+      <View
+        style={{
+          padding: 2,
+          borderRadius: 999,
+          borderWidth: 2,
+          borderColor: focused ? colors.primary : "transparent",
+          opacity: focused ? 1 : 0.8,
+        }}
+      >
+        <AvatarWithBorder
+          avatarKey={u?.avatarKey}
+          avatarUrl={u?.avatarUrl}
+          name={u?.name ?? u?.username}
+          level={level ?? 1}
+          size={28}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
 function PlusItem({ onPress }: { onPress: () => void }) {
   return (
     <View style={styles.item}>
@@ -93,7 +145,7 @@ function PlusItem({ onPress }: { onPress: () => void }) {
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-
+  const progress = useProgress();
   // Tab dengan href: null (mis. tombol plus untuk VIEWER) tidak ditampilkan
   const routes = state.routes.filter(
     (r) => (descriptors[r.key].options as any).href !== null,
@@ -125,6 +177,17 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             );
           }
           const { options } = descriptors[route.key];
+          if (route.name === "account") {
+            return (
+              <AvatarTabItem
+                key={route.key}
+                label={(options.title as string) ?? route.name}
+                level={progress.data?.level}
+                focused={route.key === activeKey}
+                onPress={() => press(route, route.key === activeKey)}
+              />
+            );
+          }
           return (
             <TabItem
               key={route.key}

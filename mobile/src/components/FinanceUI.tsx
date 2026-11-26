@@ -10,6 +10,7 @@ import { categoryLabel, CategoryGlyph, TransferGlyph } from "./CategoryGlyph";
 import { SpaceEmoji } from "./SpaceUI";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../lib/auth";
+import { AvatarWithBorder } from "./AvatarWithBorder";
 export const POSITIVE = "#067647";
 import {
   Image,
@@ -158,6 +159,26 @@ function Avatar({ size = 34 }: { size?: number }) {
   );
 }
 
+function TopBarAvatar({ level }: { level?: number }) {
+  const { user } = useAuth();
+  const u = user as {
+    avatarKey?: string | null;
+    avatarUrl?: string | null;
+    name?: string | null;
+    username?: string;
+  } | null;
+
+  return (
+    <AvatarWithBorder
+      avatarKey={u?.avatarKey}
+      avatarUrl={u?.avatarUrl}
+      name={u?.name ?? u?.username}
+      level={level ?? 1}
+      size={28}
+    />
+  );
+}
+
 function IconButton({
   icon,
   label,
@@ -191,10 +212,12 @@ export function HeroTopBar({
   notificationCount = 0,
   onNotifications,
   onAvatarPress,
+  level,
 }: {
   notificationCount?: number;
   onNotifications?: () => void;
   onAvatarPress?: () => void;
+  level?: number;
 }) {
   return (
     <View style={styles.topBar}>
@@ -204,7 +227,7 @@ export function HeroTopBar({
         accessibilityRole="button"
         accessibilityLabel="Profil"
       >
-        <Avatar />
+        <TopBarAvatar level={level} />
       </Pressable>
 
       <View style={styles.topActions}>
