@@ -3,7 +3,7 @@ import { Animated, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { space } from "../lib/theme";
 
-export const TOPBAR_H = 40; // tinggi baris avatar / ikon
+export const TOPBAR_H = 42; // tinggi baris avatar / ikon
 export const TOPBAR_GAP = 20; // jarak ke MonthPicker (dulu marginBottom)
 
 export function StickyTopBar({

@@ -194,12 +194,20 @@ authRouter.post("/logout", async (req, res) => {
 
 authRouter.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findFirst({
-    where: { id: (req as any).userId, deletedAt: null },
+    where: { id: req.userId, deletedAt: null },
     select: {
       id: true,
       email: true,
       username: true,
-      profile: { select: { displayName: true, avatarUrl: true } },
+      profile: {
+        select: {
+          displayName: true,
+          avatarUrl: true,
+          avatarKey: true,
+          onboardingDone: true,
+        },
+      },
+      security: { select: { userId: true } },
     },
   });
   if (!user) return res.status(404).json({ error: "User tidak ditemukan" });
@@ -209,5 +217,8 @@ authRouter.get("/me", requireAuth, async (req, res) => {
     username: user.username,
     name: user.profile?.displayName ?? null,
     avatarUrl: user.profile?.avatarUrl ?? null,
+    avatarKey: user.profile?.avatarKey ?? null,
+    onboardingDone: user.profile?.onboardingDone ?? false,
+    hasPin: !!user.security,
   });
 });

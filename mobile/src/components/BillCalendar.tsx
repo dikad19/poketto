@@ -36,24 +36,40 @@ const INCOME = "#12B76A";
 const EXPENSE = "#F04438";
 const GAP = 4;
 const CELL_H = 88;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEKEND = "#E5484D";
 
-// Ikon + warna per tagihan (dari judul, tanpa kolom baru di schema)
 function billStyle(title: string): { icon: IconName; color: string } {
   const t = title.toLowerCase();
-  if (/listrik|pln|electric|power/.test(t))
-    return { icon: "lightning-bolt", color: "#F5B301" };
+
   if (/spotify/.test(t)) return { icon: "spotify", color: "#1DB954" };
   if (/netflix/.test(t)) return { icon: "netflix", color: "#E50914" };
   if (/youtube/.test(t)) return { icon: "youtube", color: "#FF0000" };
-  if (/wifi|internet|indihome/.test(t))
+  if (/disney|hbo|vidio|prime video|apple tv|streaming/.test(t))
+    return { icon: "television-play", color: "#4F46E5" };
+  if (/icloud|google one|onedrive|dropbox|cloud/.test(t))
+    return { icon: "cloud", color: "#2E90FA" };
+
+  // Utilitas
+  if (/listrik|\bpln\b|electric|\bpower\b/.test(t))
+    return { icon: "lightning-bolt", color: "#F5B301" };
+  if (/wi-?fi|internet|indihome/.test(t))
     return { icon: "wifi", color: "#2E90FA" };
-  if (/air|pdam|water/.test(t)) return { icon: "water", color: "#06AED4" };
-  if (/pulsa|phone|telp|data/.test(t))
+  if (/\bair\b|pdam|\bwater\b/.test(t))
+    return { icon: "water", color: "#06AED4" };
+  if (/pulsa|\bphone\b|telp|\bdata\b|paket data/.test(t))
     return { icon: "cellphone", color: "#7A5AF8" };
-  if (/kos|sewa|rent|rumah/.test(t)) return { icon: "home", color: "#B54708" };
+
+  if (/bpjs|asuransi|insurance|prudential|allianz/.test(t))
+    return { icon: "shield-check", color: "#12B76A" };
+  if (/\bgym\b|fitness/.test(t)) return { icon: "dumbbell", color: "#F04438" };
+  if (/sekolah|school|\bukt\b|\bspp\b|kuliah|kursus|course/.test(t))
+    return { icon: "school", color: "#0E9384" };
+  if (/\bkost?\b|sewa|\brent\b|rumah/.test(t))
+    return { icon: "home", color: "#B54708" };
   if (/cicil|loan|kredit|pinjam/.test(t))
     return { icon: "credit-card", color: "#344054" };
+
   return { icon: "receipt-text", color: "#F79009" };
 }
 
@@ -125,18 +141,16 @@ export function BillCalendar({
 
   const [width, setWidth] = useState(0);
   const [weekIndex, setWeekIndex] = useState(todayWeek);
-  const [selected, setSelected] = useState<Date>(
-    isThisMonth ? today : new Date(year, m, 1),
-  );
+  const [selected, setSelected] = useState<Date | null>(null);
   const [form, setForm] = useState<{ bill: Bill | null } | null>(null);
   const listRef = useRef<FlatList<Date[]>>(null);
   const indexRef = useRef(todayWeek);
-
-  // Ganti bulan: kembali ke minggu hari ini / minggu pertama
+  const targetRef = useRef<number | null>(null);
   useEffect(() => {
     indexRef.current = todayWeek;
     setWeekIndex(todayWeek);
-    setSelected(isThisMonth ? new Date() : new Date(year, m, 1));
+    setSelected(null);
+    targetRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, m]);
 
@@ -165,11 +179,11 @@ export function BillCalendar({
     if (i < 0 || i >= weeks.length) return;
     indexRef.current = i;
     setWeekIndex(i);
-    setSelected((prev) => weeks[i][(prev.getDay() + 6) % 7]);
   };
 
   const goTo = (i: number) => {
     if (i < 0 || i >= weeks.length) return;
+    targetRef.current = i;
     listRef.current?.scrollToIndex({ index: i, animated: true });
     changeWeek(i);
   };
@@ -177,6 +191,13 @@ export function BillCalendar({
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!width) return;
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
+
+    // Sedang animasi menuju minggu tertentu: abaikan sampai tiba
+    if (targetRef.current !== null) {
+      if (i === targetRef.current) targetRef.current = null;
+      return;
+    }
+
     if (i !== indexRef.current) changeWeek(i);
   };
 
@@ -192,10 +213,13 @@ export function BillCalendar({
 
   const cellW = width ? (width - GAP * 6) / 7 : 0;
   const selInMonth =
-    selected.getMonth() === m && selected.getFullYear() === year;
-  const selTotals = selInMonth ? dayTotals[selected.getDate()] : undefined;
-  const selBills = billsOn(selected);
+    !!selected && selected.getMonth() === m && selected.getFullYear() === year;
+  const selTotals =
+    selected && selInMonth ? dayTotals[selected.getDate()] : undefined;
+  const selBills = selected ? billsOn(selected) : [];
 
+  // Saat belum ada yang dipilih, detail menampilkan tagihan minggu yang terlihat
+  const weekBills = week.flatMap((d) => billsOn(d).map((b) => ({ b, d })));
   const confirmDelete = (b: Bill) =>
     Alert.alert(
       "Delete bill",
@@ -222,70 +246,111 @@ export function BillCalendar({
       {item.map((d) => {
         const inMonth = d.getMonth() === m && d.getFullYear() === year;
         const isToday = sameDay(d, today);
-        const isSel = sameDay(d, selected);
-        const t = inMonth ? dayTotals[d.getDate()] : undefined;
+        const isSel = !!selected && sameDay(d, selected);
+        const dow = (d.getDay() + 6) % 7; // 0 = Senin
+        const isWeekend = dow >= 5;
         const dayBills = billsOn(d);
-        const shown = dayBills.length > 4 ? dayBills.slice(0, 3) : dayBills;
-        const extra = dayBills.length - shown.length;
+        const first = dayBills[0];
+        const st = first ? billStyle(first.title) : null;
+        const extra = dayBills.length - 1;
 
         return (
           <Pressable
             key={d.toISOString()}
-            onPress={() => setSelected(d)}
+            onPress={() => setSelected(isSel ? null : d)}
             style={[
               s.cell,
               { width: cellW },
               isSel && s.cellSel,
-              !inMonth && { opacity: 0.45 },
+              !inMonth && { opacity: 0.4 },
             ]}
           >
-            <View
-              style={[
-                s.dateBadge,
-                isToday && { backgroundColor: colors.primary },
-              ]}
-            >
-              <Text style={[s.dateText, isToday && { color: "#fff" }]}>
+            <View style={s.dateWrap}>
+              <Text
+                style={[
+                  s.dateText,
+                  isWeekend && { color: WEEKEND },
+                  isToday && !isSel && { color: colors.primary },
+                  isSel && {
+                    color: isWeekend ? WEEKEND : colors.primary,
+                  },
+                ]}
+              >
                 {d.getDate()}
               </Text>
+              {isToday ? <View style={s.todayDot} /> : null}
             </View>
 
-            <View style={s.events}>
-              {shown.map((b) => {
-                const st = billStyle(b.title);
-                return (
-                  <View
-                    key={b.id}
-                    style={[s.tile, { backgroundColor: st.color + "22" }]}
-                  >
-                    <MaterialCommunityIcons
-                      name={st.icon}
-                      size={11}
-                      color={st.color}
-                    />
+            {st ? (
+              <View style={[s.icon, { backgroundColor: st.color }]}>
+                <MaterialCommunityIcons name={st.icon} size={14} color="#fff" />
+                {extra > 0 ? (
+                  <View style={s.badge}>
+                    <Text style={s.badgeText}>+{extra}</Text>
                   </View>
-                );
-              })}
-              {extra > 0 ? (
-                <View style={[s.tile, { backgroundColor: colors.paper }]}>
-                  <Text style={s.more}>+{extra + 1}</Text>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={s.marks}>
-              {t && t.expense > 0 ? (
-                <View style={[s.dot, { backgroundColor: EXPENSE }]} />
-              ) : null}
-              {t && t.income > 0 ? (
-                <View style={[s.dot, { backgroundColor: INCOME }]} />
-              ) : null}
-            </View>
+                ) : null}
+              </View>
+            ) : (
+              <View
+                style={[
+                  s.icon,
+                  s.iconEmpty,
+                  isSel && { borderColor: colors.primary + "66" },
+                ]}
+              />
+            )}
           </Pressable>
         );
       })}
     </View>
   );
+
+  const renderBillRow = (b: Bill, dateLabel?: string) => {
+    const st = billStyle(b.title);
+    return (
+      <View key={b.id + (dateLabel ?? "")} style={s.billRow}>
+        <View style={[s.billIcon, { backgroundColor: st.color + "22" }]}>
+          <MaterialCommunityIcons name={st.icon} size={18} color={st.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.billTitle} numberOfLines={1}>
+            {b.title}
+          </Text>
+          <Text style={s.billSub}>
+            {dateLabel ? `${dateLabel} · ` : ""}
+            {b.frequency === "MONTHLY" ? "Every month" : "Every year"}
+          </Text>
+        </View>
+        <Text style={s.billAmount}>{formatMoney(b.amount, currency)}</Text>
+        {canEdit ? (
+          <View style={s.billActions}>
+            <Pressable
+              hitSlop={8}
+              onPress={() => setForm({ bill: b })}
+              accessibilityLabel={`Edit ${b.title}`}
+            >
+              <MaterialCommunityIcons
+                name="pencil-outline"
+                size={19}
+                color={colors.muted}
+              />
+            </Pressable>
+            <Pressable
+              hitSlop={8}
+              onPress={() => confirmDelete(b)}
+              accessibilityLabel={`Delete ${b.title}`}
+            >
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={19}
+                color={EXPENSE}
+              />
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View style={s.card}>
@@ -300,13 +365,7 @@ export function BillCalendar({
           </Text>
         </View>
         {isThisMonth && weekIndex !== todayWeek ? (
-          <Pressable
-            onPress={() => {
-              goTo(todayWeek);
-              setSelected(new Date());
-            }}
-            style={s.todayChip}
-          >
+          <Pressable onPress={() => goTo(todayWeek)} style={s.todayChip}>
             <Text style={s.todayText}>Hari ini</Text>
           </Pressable>
         ) : null}
@@ -326,11 +385,24 @@ export function BillCalendar({
         {width > 0 ? (
           <>
             <View style={[s.weekRow, { gap: GAP }]}>
-              {WEEKDAYS.map((w) => (
-                <Text key={w} style={[s.weekday, { width: cellW }]}>
-                  {w}
-                </Text>
-              ))}
+              {WEEKDAYS.map((w, i) => {
+                const active = !!selected && sameDay(week[i], selected);
+                const weekend = i >= 5;
+                return (
+                  <Text
+                    key={i}
+                    style={[
+                      s.weekday,
+                      { width: cellW },
+                      weekend && { color: WEEKEND },
+                      active && s.weekdayActive,
+                      active && weekend && { color: WEEKEND },
+                    ]}
+                  >
+                    {w}
+                  </Text>
+                );
+              })}
             </View>
             <FlatList
               key={`${year}-${m}-${width}`}
@@ -340,6 +412,9 @@ export function BillCalendar({
               keyExtractor={(w) => w[0].toISOString()}
               horizontal
               pagingEnabled
+              onScrollBeginDrag={() => {
+                targetRef.current = null;
+              }}
               showsHorizontalScrollIndicator={false}
               initialScrollIndex={todayWeek}
               getItemLayout={(_, i) => ({
@@ -365,81 +440,49 @@ export function BillCalendar({
 
       {/* Detail hari terpilih */}
       <View style={s.detail}>
-        <View style={s.detailHead}>
-          <Text style={s.detailDate}>
-            {selected.toLocaleDateString("en-US", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
-          </Text>
-          <Text style={s.totalText}>
-            <Text style={{ color: EXPENSE }}>
-              −{formatMoney(selTotals?.expense ?? 0, currency)}
-            </Text>
-            {"   "}
-            <Text style={{ color: INCOME }}>
-              +{formatMoney(selTotals?.income ?? 0, currency)}
-            </Text>
-          </Text>
-        </View>
-
-        {selBills.length === 0 ? (
-          <Text style={s.empty}>No bills this day 🎉</Text>
-        ) : (
-          selBills.map((b) => {
-            const st = billStyle(b.title);
-            return (
-              <View key={b.id} style={s.billRow}>
-                <View
-                  style={[s.billIcon, { backgroundColor: st.color + "22" }]}
-                >
-                  <MaterialCommunityIcons
-                    name={st.icon}
-                    size={18}
-                    color={st.color}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.billTitle} numberOfLines={1}>
-                    {b.title}
-                  </Text>
-                  <Text style={s.billSub}>
-                    {b.frequency === "MONTHLY" ? "Every month" : "Every year"}
-                  </Text>
-                </View>
-                <Text style={s.billAmount}>
-                  {formatMoney(b.amount, currency)}
+        {selected ? (
+          <>
+            <View style={s.detailHead}>
+              <Text style={s.detailDate}>
+                {selected.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </Text>
+              <Text style={s.totalText}>
+                <Text style={{ color: EXPENSE }}>
+                  −{formatMoney(selTotals?.expense ?? 0, currency)}
                 </Text>
-                {canEdit ? (
-                  <View style={s.billActions}>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => setForm({ bill: b })}
-                      accessibilityLabel={`Edit ${b.title}`}
-                    >
-                      <MaterialCommunityIcons
-                        name="pencil-outline"
-                        size={19}
-                        color={colors.muted}
-                      />
-                    </Pressable>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => confirmDelete(b)}
-                      accessibilityLabel={`Delete ${b.title}`}
-                    >
-                      <MaterialCommunityIcons
-                        name="trash-can-outline"
-                        size={19}
-                        color={EXPENSE}
-                      />
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })
+                {"   "}
+                <Text style={{ color: INCOME }}>
+                  +{formatMoney(selTotals?.income ?? 0, currency)}
+                </Text>
+              </Text>
+            </View>
+            {selBills.length === 0 ? (
+              <Text style={s.empty}>No bills this day</Text>
+            ) : (
+              selBills.map((b) => renderBillRow(b))
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={s.detailDate}>{weekLabel}</Text>
+            {weekBills.length === 0 ? (
+              <Text style={s.empty}>No bills this week</Text>
+            ) : (
+              weekBills.map(({ b, d }) =>
+                renderBillRow(
+                  b,
+                  d.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    day: "numeric",
+                  }),
+                ),
+              )
+            )}
+          </>
         )}
       </View>
 
@@ -447,9 +490,9 @@ export function BillCalendar({
         <BillForm
           key={form.bill?.id ?? "new"}
           bill={form.bill}
-          defaultDay={selected.getDate()}
-          year={selected.getFullYear()}
-          month={selected.getMonth()}
+          defaultDay={(selected ?? week[0]).getDate()}
+          year={(selected ?? week[0]).getFullYear()}
+          month={(selected ?? week[0]).getMonth()}
           wallets={wallets}
           onClose={() => setForm(null)}
           onSave={async (input) => {
@@ -630,21 +673,10 @@ function BillForm({
 }
 
 const s = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 14,
-    gap: 10,
-  },
   head: { flexDirection: "row", alignItems: "center", gap: 6 },
   title: { fontSize: 16, fontWeight: "700", color: colors.ink },
   sub: { fontSize: 11, color: colors.muted, marginTop: 1 },
-  todayChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: colors.paper,
-  },
+
   todayText: { fontSize: 12, fontWeight: "600", color: colors.primary },
   addBtn: {
     width: 32,
@@ -657,23 +689,9 @@ const s = StyleSheet.create({
   },
 
   weekRow: { flexDirection: "row", marginBottom: 6 },
-  weekday: {
-    textAlign: "center",
-    fontSize: 11,
-    color: colors.muted,
-    fontWeight: "600",
-  },
+
   page: { flexDirection: "row", gap: GAP },
-  cell: {
-    height: CELL_H,
-    borderRadius: 12,
-    backgroundColor: colors.paper,
-    alignItems: "center",
-    paddingTop: 6,
-    paddingHorizontal: 2,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
+
   pageDots: {
     flexDirection: "row",
     justifyContent: "center",
@@ -687,15 +705,72 @@ const s = StyleSheet.create({
     backgroundColor: colors.line,
   },
   pageDotActive: { backgroundColor: colors.primary, width: 14 },
-  cellSel: { borderColor: colors.primary, backgroundColor: colors.surface },
-  dateBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
+
+  card: {
+    backgroundColor: colors.paper, // abu-abu lembut, sel jadi putih
+    borderRadius: 24,
+    padding: 14,
+    gap: 10,
+  },
+  todayChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.surface, // sebelumnya paper, jadi tak terlihat
+  },
+
+  weekday: {
+    textAlign: "center",
+    fontSize: 14,
+    color: colors.muted,
+    fontWeight: "500",
+  },
+  weekdayActive: { color: colors.primary },
+  cellSel: {
+    backgroundColor: colors.primary + "1F", // ±12% opacity
+    borderColor: colors.primary,
+  },
+  cell: {
+    height: 100,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderWidth: 2,
+    borderColor: "transparent", // supaya ukuran tidak bergeser saat outline muncul
+  },
+
+  dateText: { fontSize: 17, fontWeight: "500", color: colors.ink },
+
+  icon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
-  dateText: { fontSize: 13, fontWeight: "600", color: colors.ink },
+  iconEmpty: {
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.line,
+  },
+  badge: {
+    position: "absolute",
+    top: -7,
+    right: -9,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+  },
+  badgeText: { fontSize: 8, color: "#fff" },
   events: {
     flex: 1,
     flexDirection: "row",
@@ -716,7 +791,13 @@ const s = StyleSheet.create({
   more: { fontSize: 9, fontWeight: "700", color: colors.muted },
   marks: { flexDirection: "row", gap: 3, height: 10, alignItems: "center" },
   dot: { width: 5, height: 5, borderRadius: 3 },
-
+  dateWrap: { alignItems: "center", gap: 3 },
+  todayDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
   detail: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.line,
@@ -732,13 +813,7 @@ const s = StyleSheet.create({
   totalText: { fontSize: 12, fontWeight: "600" },
   empty: { fontSize: 13, color: colors.muted },
   billRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  billIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+
   billTitle: { fontSize: 15, fontWeight: "600", color: colors.ink },
   billSub: { fontSize: 12, color: colors.muted },
   billAmount: { fontSize: 14, fontWeight: "700", color: colors.ink },
@@ -755,6 +830,13 @@ const s = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 8,
+  },
+  billIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sheetTitle: {
     fontSize: 18,

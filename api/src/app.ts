@@ -12,6 +12,7 @@ import { walletsRouter, categoriesRouter } from "./routes/wallets";
 import { transactionsRouter } from "./routes/transactions";
 import { dashboardRouter } from "./routes/dashboard";
 import { billsRouter } from "./routes/bills";
+import { meRouter } from "./routes/me";
 export const app = express();
 
 app.use(helmet());
@@ -28,7 +29,7 @@ app.use("/spaces/:spaceId/transactions", requireAuth, transactionsRouter);
 app.use("/spaces/:spaceId/dashboard", requireAuth, dashboardRouter);
 app.use("/spaces", requireAuth, spacesRouter);
 app.use("/invitations", requireAuth, myInvitationsRouter);
-
+app.use("/me", requireAuth, meRouter);
 app.use((_req, res) => {
   res.status(404).json({ error: "Rute tidak ditemukan" });
 });
