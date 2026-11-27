@@ -1,14 +1,15 @@
 export const colors = {
-  primary: "#8E2043", // burgundy
-  primaryPressed: "#6F1833", // burgundy lebih gelap saat ditekan
-  coin: "#F5B335", // emas, kontras bagus dengan burgundy
+  primary: "#8E2043",
+  primaryLight: "#8e204398",
+  primaryPressed: "#6F1833",
+  coin: "#F5B335",
   ink: "#2A1218",
   muted: "#7A5C64",
   placeholder: "#A8909A",
-  paper: "#fffbfb", // blush
+  paper: "#fffbfb",
   surface: "#FFFFFF",
   line: "#EBD7DC",
-  error: "#D92D20", // merah terang, beda dari burgundy
+  error: "#D92D20",
   errorBg: "#FEF3F2",
   errorLine: "#FDA29B",
 };

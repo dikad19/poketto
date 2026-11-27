@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { setStatusBarStyle } from "expo-status-bar";
+// import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useRef, useState } from "react";
 import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../components/Button";
@@ -138,12 +138,12 @@ export default function DashboardScreen() {
   );
 
   // Hero berlatar gelap: ikon status bar putih selama tab ini aktif
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle("light");
-      return () => setStatusBarStyle("dark");
-    }, []),
-  );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     setStatusBarStyle("light");
+  //     return () => setStatusBarStyle("dark");
+  //   }, []),
+  // );
 
   const canAdd = !!active && hasRole(active.role, "MEMBER");
   const currency = data?.currency ?? "IDR";

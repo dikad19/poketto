@@ -1,0 +1,26 @@
+{
+  "common": { "cancel": "Batal" },
+  "lock": {
+    "forgotTitle": "Lupa PIN?",
+    "forgotMessage": "Kamu akan keluar dari akun. Setelah masuk lagi, kamu bisa membuat PIN baru dengan konfirmasi password.",
+    "logout": "Keluar"
+  },
+  "account": {
+    "language": "Bahasa",
+    "pendingInvites_other": "{{count}} undangan menunggu jawaban Anda",
+    "pendingInvitesHint": "Ketuk untuk melihat dan menjawab.",
+    "mySpaces": "Space saya",
+    "noSpacesTitle": "Belum ada space",
+    "noSpacesBody": "Buat space untuk mencatat keuangan bersama.",
+    "active": "aktif",
+    "members_other": "{{count}} anggota",
+    "useThisSpace": "Pakai space ini",
+    "createSpace": "Buat space baru",
+    "myInvites": "Undangan saya",
+    "myInvitesCount": "Undangan saya ({{count}})",
+    "logout": "Keluar"
+  },
+  "spaces": {
+    "types": {}
+  }
+}

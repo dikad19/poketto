@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.line,
   },
   header: { flexDirection: "row", alignItems: "center", gap: space.md },
-  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 16, fontWeight: "500", color: colors.ink },
   subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
   closeBtn: {
     width: 32,

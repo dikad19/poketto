@@ -12,13 +12,16 @@ import { AuthProvider, useAuth } from "../lib/auth";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { LOCK_SUPPORTED, LockScreen, hasLocalPin } from "../components/AppLock";
 import { useBootstrap } from "../hooks/useAppBootstrap";
+import { useTranslation } from "react-i18next";
+import { initI18n } from "../i18n";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 SplashScreen.preventAutoHideAsync();
 
-// Halaman yang boleh dibuka tanpa login. Sesuaikan dengan route kamu.
 const AUTH_ROUTES = ["login", "register", "forgot-password"];
 
 function RootNavigator() {
+  const { t } = useTranslation();
   const { user, loading, locked, unlock, logout } = useAuth();
   const { ready, progress, label } = useBootstrap(user, loading);
   const [finished, setFinished] = useState(false);
@@ -30,20 +33,10 @@ function RootNavigator() {
     SplashScreen.hideAsync();
   }, []);
 
-  // kalau loading muncul lagi (mis. setelah login), reset
   useEffect(() => {
     if (!ready) setFinished(false);
   }, [ready]);
 
-  /* ---------------------------------------------------------------
-     GUARD: tentukan user harus ada di halaman mana
-       belum login            -> /login
-       belum pilih avatar     -> /onboarding/avatar
-       belum buat PIN         -> /onboarding/pin
-       PIN ada di server tapi
-       belum ada di HP ini    -> /onboarding/verify-pin
-       semua beres            -> keluar dari login/onboarding
-     --------------------------------------------------------------- */
   useEffect(() => {
     if (!ready || !finished || !navState?.key) return;
     let off = false;
@@ -60,13 +53,12 @@ function RootNavigator() {
 
       let required: string | null = null;
       if (!user.avatarKey) required = "/onboarding/avatar";
-      // PIN & kunci hanya untuk app native; di web dilewati
       else if (LOCK_SUPPORTED && !user.hasPin) required = "/onboarding/pin";
       else if (LOCK_SUPPORTED && !(await hasLocalPin()))
         required = "/onboarding/verify-pin";
       if (off) return;
 
-      const onReset = path === "/onboarding/reset-pin"; // boleh diakses (lupa/ganti PIN)
+      const onReset = path === "/onboarding/reset-pin";
 
       if (required) {
         const allowed =
@@ -84,7 +76,7 @@ function RootNavigator() {
     return () => {
       off = true;
     };
-  }, [user, segments, ready, finished, navState?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, segments, ready, finished, navState?.key]);
 
   if (!ready || !finished) {
     return (
@@ -97,14 +89,10 @@ function RootNavigator() {
   }
 
   const confirmForgot = () =>
-    Alert.alert(
-      "Lupa PIN?",
-      "Kamu akan keluar dari akun. Setelah masuk lagi, kamu bisa membuat PIN baru dengan konfirmasi password.",
-      [
-        { text: "Batal", style: "cancel" },
-        { text: "Keluar", style: "destructive", onPress: () => logout() },
-      ],
-    );
+    Alert.alert(t("lock.forgotTitle"), t("lock.forgotMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("lock.logout"), style: "destructive", onPress: () => logout() },
+    ]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -112,7 +100,6 @@ function RootNavigator() {
         {/* sama seperti sebelumnya */}
       </Stack>
 
-      {/* Layar kunci menimpa app tanpa meng-unmount navigasi, jadi posisi halaman tidak hilang */}
       {user && locked && (
         <View style={StyleSheet.absoluteFill}>
           <LockScreen onUnlock={unlock} onForgot={confirmForgot} />
@@ -123,10 +110,20 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [i18nReady, setI18nReady] = useState(false);
+
+  useEffect(() => {
+    initI18n().finally(() => setI18nReady(true));
+  }, []);
+
+  if (!i18nReady) return null;
+
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <RootNavigator />
-    </AuthProvider>
+    <KeyboardProvider>
+      <AuthProvider>
+        <StatusBar style="dark" />
+        <RootNavigator />
+      </AuthProvider>
+    </KeyboardProvider>
   );
 }

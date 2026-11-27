@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { space } from "../lib/theme";
+import { colors, space } from "../lib/theme";
 
 export const TOPBAR_H = 42; // tinggi baris avatar / ikon
 export const TOPBAR_GAP = 20; // jarak ke MonthPicker (dulu marginBottom)
@@ -32,10 +32,10 @@ export function StickyTopBar({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: "#7A1D3A",
+            backgroundColor: colors.paper,
             opacity: bg,
             borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: "rgba(255,255,255,0.18)",
+            borderBottomColor: colors.errorBg,
           },
         ]}
       />

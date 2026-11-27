@@ -33,7 +33,7 @@ function QuestRow({ quest }: { quest: Quest }) {
       : null;
 
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 4 }}>
       <View
         style={{
           flexDirection: "row",
@@ -49,18 +49,10 @@ function QuestRow({ quest }: { quest: Quest }) {
             flex: 1,
           }}
         >
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: st.color,
-            }}
-          />
           <Text
             style={{
               fontSize: 14,
-              fontWeight: "700",
+              fontWeight: "500",
               color: colors.ink,
               flexShrink: 1,
             }}
@@ -70,7 +62,7 @@ function QuestRow({ quest }: { quest: Quest }) {
           </Text>
         </View>
         <Text
-          style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}
+          style={{ fontSize: 12, fontWeight: "500", color: colors.primary }}
         >
           +{quest.exp} EXP
         </Text>
@@ -130,7 +122,7 @@ export function QuestWidget({
       onPress={onPress}
       style={({ pressed }) => ({
         padding: space.md,
-        borderRadius: 20,
+        borderRadius: 6,
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.line,
@@ -142,8 +134,8 @@ export function QuestWidget({
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <View
             style={{
-              width: 52,
-              height: 52,
+              width: 45,
+              height: 45,
               borderRadius: 26,
               backgroundColor: color + "22",
               borderWidth: 2,
@@ -155,7 +147,7 @@ export function QuestWidget({
             {image ? (
               <Image
                 source={image}
-                style={{ width: 36, height: 36 }}
+                style={{ width: 30, height: 30, marginBottom: 5 }}
                 resizeMode="contain"
               />
             ) : (
@@ -172,7 +164,7 @@ export function QuestWidget({
               }}
             >
               <Text
-                style={{ fontSize: 16, fontWeight: "800", color: colors.ink }}
+                style={{ fontSize: 16, fontWeight: "500", color: colors.ink }}
                 numberOfLines={1}
               >
                 {progress.levelName}
@@ -223,13 +215,13 @@ export function QuestWidget({
           {pickQuests(quests).map((q) => (
             <QuestRow key={q.id} quest={q} />
           ))}
-          {quests.length > MAX_VISIBLE ? (
+          {/* {quests.length > MAX_VISIBLE ? (
             <Text
-              style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}
+              style={{ fontSize: 12, fontWeight: "500", color: colors.primary }}
             >
               Lihat semua quest ({quests.length})
             </Text>
-          ) : null}
+          ) : null} */}
         </View>
       ) : null}
     </Pressable>

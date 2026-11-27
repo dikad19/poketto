@@ -34,7 +34,7 @@ type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const INCOME = "#12B76A";
 const EXPENSE = "#F04438";
-const GAP = 4;
+const GAP = 6;
 const CELL_H = 88;
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const WEEKEND = "#E5484D";
@@ -211,7 +211,7 @@ export function BillCalendar({
       : short(week[6])
   }`;
 
-  const cellW = width ? (width - GAP * 6) / 7 : 0;
+  const cellW = width ? (width - GAP * 7) / 7 : 0;
   const selInMonth =
     !!selected && selected.getMonth() === m && selected.getFullYear() === year;
   const selTotals =
@@ -360,7 +360,7 @@ export function BillCalendar({
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Tagihan</Text>
           <Text style={s.sub} numberOfLines={1}>
-            {monthBills.count} tagihan ·{" "}
+            {monthBills.count} tagihan -{" "}
             {formatMoney(monthBills.total, currency)} bulan ini
           </Text>
         </View>
@@ -375,13 +375,13 @@ export function BillCalendar({
             style={({ pressed }) => [s.addBtn, { opacity: pressed ? 0.7 : 1 }]}
             accessibilityLabel="Tambah tagihan"
           >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <MaterialCommunityIcons name="plus" size={14} color="#fff" />
           </Pressable>
         ) : null}
       </View>
 
       {/* Nama hari (tetap) + pager mingguan */}
-      <View onLayout={onLayout}>
+      <View onLayout={onLayout} style={{ overflow: "hidden" }}>
         {width > 0 ? (
           <>
             <View style={[s.weekRow, { gap: GAP }]}>
@@ -673,14 +673,19 @@ function BillForm({
 }
 
 const s = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 6 },
-  title: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 10,
+  },
+  title: { fontSize: 14, fontWeight: "500", color: colors.ink },
   sub: { fontSize: 11, color: colors.muted, marginTop: 1 },
 
   todayText: { fontSize: 12, fontWeight: "600", color: colors.primary },
   addBtn: {
-    width: 32,
-    height: 32,
+    width: 26,
+    height: 26,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -688,15 +693,23 @@ const s = StyleSheet.create({
     marginLeft: 2,
   },
 
-  weekRow: { flexDirection: "row", marginBottom: 6 },
-
-  page: { flexDirection: "row", gap: GAP },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 6,
+    paddingHorizontal: GAP / 2,
+  },
+  page: {
+    flexDirection: "row",
+    gap: GAP,
+    paddingHorizontal: GAP / 2,
+  },
 
   pageDots: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 5,
-    marginTop: 8,
+    marginTop: 20,
+    marginBottom: 15,
   },
   pageDot: {
     width: 5,
@@ -707,9 +720,11 @@ const s = StyleSheet.create({
   pageDotActive: { backgroundColor: colors.primary, width: 14 },
 
   card: {
-    backgroundColor: colors.paper, // abu-abu lembut, sel jadi putih
-    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 6,
     padding: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
     gap: 10,
   },
   todayChip: {
@@ -726,10 +741,6 @@ const s = StyleSheet.create({
     fontWeight: "500",
   },
   weekdayActive: { color: colors.primary },
-  cellSel: {
-    backgroundColor: colors.primary + "1F", // ±12% opacity
-    borderColor: colors.primary,
-  },
   cell: {
     height: 100,
     borderRadius: 999,
@@ -738,8 +749,12 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 14,
     paddingBottom: 12,
-    borderWidth: 2,
-    borderColor: "transparent", // supaya ukuran tidak bergeser saat outline muncul
+    borderWidth: 1.5, // sebelumnya 2
+    borderColor: colors.line,
+  },
+  cellSel: {
+    backgroundColor: colors.primary + "1F",
+    borderColor: colors.primary,
   },
 
   dateText: { fontSize: 17, fontWeight: "500", color: colors.ink },
@@ -801,8 +816,9 @@ const s = StyleSheet.create({
   detail: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.line,
-    paddingTop: 10,
-    gap: 10,
+    paddingTop: 15,
+    paddingBottom: 5,
+    gap: 0,
   },
   detailHead: {
     flexDirection: "row",
@@ -810,7 +826,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   detailDate: { fontSize: 14, fontWeight: "700", color: colors.ink },
-  totalText: { fontSize: 12, fontWeight: "600" },
+  totalText: { fontSize: 12, fontWeight: "500" },
   empty: { fontSize: 13, color: colors.muted },
   billRow: { flexDirection: "row", alignItems: "center", gap: 10 },
 

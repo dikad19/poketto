@@ -2,32 +2,32 @@ import { Prisma } from "../generated/prisma/client";
 import { prisma } from "../lib/prisma";
 
 /* =====================================================================
-   KONFIGURASI (sengaja dibuat lambat)
-   Maks/bulan = 30 hari x 5 + 100 = 250 EXP. Level 9 butuh 5500 EXP
-   => minimal ~22 bulan kalau SEMPURNA terus. Realistisnya jauh lebih lama.
+   CONFIGURATION (intentionally slow)
+   Max/month = 30 days x 5 + 100 = 250 EXP. Level 9 needs 5500 EXP
+   => at least ~22 months if PERFECT every time. Realistically much longer.
    ===================================================================== */
-export const DAILY_EXP = 5; // hemat dari kemarin
-export const MONTHLY_EXP = 100; // hemat dari bulan lalu
-export const LOG_1_EXP = 2; // catat >= 1 transaksi
-export const LOG_3_EXP = 3; // catat >= 3 transaksi
-export const WEEKLY_LOG_EXP = 15; // catat transaksi >= 5 dari 7 hari
+export const DAILY_EXP = 5; // spent less than yesterday
+export const MONTHLY_EXP = 100; // spent less than last month
+export const LOG_1_EXP = 2; // log >= 1 transaction
+export const LOG_3_EXP = 3; // log >= 3 transactions
+export const WEEKLY_LOG_EXP = 15; // log transactions on >= 5 of 7 days
 const WEEKLY_LOG_DAYS = 5;
-const MIN_TX_AMOUNT = 1000; // anti-curang: transaksi di bawah ini tidak dihitung (0 = nonaktif)
+const MIN_TX_AMOUNT = 1000; // anti-cheat: transactions below this are not counted (0 = disabled)
 const MIN_LOGGED_DAYS_PER_MONTH = 15;
 const MAX_CATCHUP_DAYS = 62;
 const MAX_CATCHUP_WEEKS = 9;
 const MAX_CATCHUP_MONTHS = 6;
 
 export const LEVELS = [
-  { level: 1, minExp: 0, name: "Tunas Hemat", emoji: "🌱" },
-  { level: 2, minExp: 100, name: "Pencatat Rajin", emoji: "📝" },
-  { level: 3, minExp: 250, name: "Penabung Pemula", emoji: "🐷" },
-  { level: 4, minExp: 500, name: "Pengendali Dompet", emoji: "👛" },
-  { level: 5, minExp: 900, name: "Penghemat Cerdas", emoji: "💡" },
-  { level: 6, minExp: 1500, name: "Master Anggaran", emoji: "🎯" },
-  { level: 7, minExp: 2400, name: "Penjaga Kas", emoji: "🛡️" },
-  { level: 8, minExp: 3700, name: "Raja Hemat", emoji: "👑" },
-  { level: 9, minExp: 5500, name: "Legenda Finansial", emoji: "🏆" },
+  { level: 1, minExp: 0, name: "Penny Sprout", emoji: "🌱" },
+  { level: 2, minExp: 100, name: "Ledger Apprentice", emoji: "📒" },
+  { level: 3, minExp: 250, name: "Coin Collector", emoji: "🪙" },
+  { level: 4, minExp: 500, name: "Wallet Warden", emoji: "👛" },
+  { level: 5, minExp: 900, name: "Budget Ninja", emoji: "🥷" },
+  { level: 6, minExp: 1500, name: "Frugal Strategist", emoji: "🎯" },
+  { level: 7, minExp: 2400, name: "Vault Keeper", emoji: "🔐" },
+  { level: 8, minExp: 3700, name: "Wealth Sovereign", emoji: "👑" },
+  { level: 9, minExp: 5500, name: "Fortune Legend", emoji: "🏆" },
 ] as const;
 export const MAX_LEVEL = LEVELS.length; // 9
 
@@ -38,7 +38,7 @@ export function levelFromExp(exp: number): number {
 }
 
 /* =====================================================================
-   HELPER TANGGAL (semua berbasis timezone user, bukan timezone server)
+   DATE HELPERS (all based on the user's timezone, not the server's)
    ===================================================================== */
 const dayKey = (d: Date, tz: string) =>
   new Intl.DateTimeFormat("en-CA", {
@@ -59,18 +59,18 @@ const addMonths = (mk: string, n: number) => {
 const monthOf = (key: string) => key.slice(0, 7);
 const monthStart = (mk: string) => `${mk}-01`;
 const monthEnd = (mk: string) => addDays(`${addMonths(mk, 1)}-01`, -1);
-// Senin (awal minggu) dari sebuah tanggal "YYYY-MM-DD". Dipakai juga sebagai periodKey mingguan.
+// Monday (start of week) for a "YYYY-MM-DD" date. Also used as the weekly periodKey.
 const weekStart = (key: string) => {
   const [y, m, d] = key.split("-").map(Number);
-  const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // Senin = 0
+  const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // Monday = 0
   return addDays(key, -dow);
 };
 /* =====================================================================
-   TOTAL PENGELUARAN PER HARI / BULAN
-   - hanya transaksi buatan user, deletedAt null
-   - pengeluaran = EXPENSE (amount x exchangeRate) + fee (EXPENSE & TRANSFER)
-   - TRANSFER antar dompet sendiri TIDAK dihitung sebagai pengeluaran
-   - hari/bulan hanya "ada" kalau minimal ada 1 transaksi tercatat
+   TOTAL SPENDING PER DAY / MONTH
+   - only user-created transactions, deletedAt null
+   - spending = EXPENSE (amount x exchangeRate) + fee (EXPENSE & TRANSFER)
+   - TRANSFERs between the user's own wallets are NOT counted as spending
+   - a day/month only "exists" if at least 1 transaction was logged
    ===================================================================== */
 type Bucket = { expense: number; tx: number; days: number };
 
@@ -98,7 +98,7 @@ async function totals(
     FROM "transactions"
     WHERE "createdById" = ${userId}
       AND "deletedAt" IS NULL
-      AND "date" >= (${fromKey}::date - 2) AND "date" < (${toKey}::date + 3)  -- pakai index
+      AND "date" >= (${fromKey}::date - 2) AND "date" < (${toKey}::date + 3)  -- use the index
       AND ${local} >= ${fromKey}::date
       AND ${local} <  (${toKey}::date + 1)
     GROUP BY 1`;
@@ -111,8 +111,8 @@ async function totals(
   );
 }
 
-/* Jumlah transaksi yang DICATAT per hari (berdasarkan createdAt, bukan tanggal transaksi,
-   supaya tidak bisa diisi dengan transaksi bertanggal mundur). */
+/* Number of transactions LOGGED per day (based on createdAt, not the transaction date,
+   so it can't be gamed by backdating transactions). */
 async function loggedPerDay(
   userId: string,
   tz: string,
@@ -135,7 +135,7 @@ async function loggedPerDay(
 }
 
 /* =====================================================================
-   PROSES EXP UNTUK 1 USER (idempotent, aman dipanggil berulang)
+   PROCESS EXP FOR 1 USER (idempotent, safe to call repeatedly)
    ===================================================================== */
 type NewEvent = {
   source:
@@ -174,7 +174,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
   });
   const events: NewEvent[] = [];
 
-  /* ---- jendela HARIAN: hari D dihitung setelah D lewat ---- */
+  /* ---- DAILY window: day D is evaluated after D has passed ---- */
   let dFrom = progress.lastDailyKey
     ? addDays(progress.lastDailyKey, 1)
     : addDays(createdDay, 1);
@@ -182,7 +182,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
   if (dFrom < dFloor) dFrom = dFloor;
   const dailyRan = dFrom <= yesterday;
 
-  /* ---- jendela MINGGUAN: minggu (Senin-Minggu) dihitung setelah berakhir ---- */
+  /* ---- WEEKLY window: a week (Monday-Sunday) is evaluated after it ends ---- */
   const thisWeek = weekStart(today);
   const lastWeekDone = addDays(thisWeek, -7);
   let wFrom = progress.lastWeeklyKey
@@ -192,7 +192,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
   if (wFrom < wFloor) wFrom = wFloor;
   const weeklyRan = wFrom <= lastWeekDone;
 
-  /* ---- jendela BULANAN ---- */
+  /* ---- MONTHLY window ---- */
   const thisMonth = monthOf(today);
   const lastFinished = addMonths(thisMonth, -1);
   let mFrom = progress.lastMonthlyKey
@@ -202,7 +202,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
   if (mFrom < mFloor) mFrom = mFloor;
   const monthlyRan = mFrom <= lastFinished;
 
-  // satu query untuk semua quest pencatatan (harian + mingguan)
+  // one query for all logging quests (daily + weekly)
   const logFrom = [dailyRan ? dFrom : null, weeklyRan ? wFrom : null]
     .filter((k): k is string => !!k)
     .sort()[0];
@@ -210,13 +210,13 @@ export async function processUserProgress(userId: string, now = new Date()) {
     ? await loggedPerDay(userId, tz, logFrom, yesterday)
     : new Map<string, number>();
 
-  /* ---- HARIAN ---- */
+  /* ---- DAILY ---- */
   if (dailyRan) {
     const t = await totals(userId, tz, addDays(dFrom, -1), yesterday, "day");
     for (let d = dFrom; d <= yesterday; d = addDays(d, 1)) {
       const cur = t.get(d);
       const prev = t.get(addDays(d, -1));
-      // kedua hari harus ada catatan (kalau lupa mencatat -> TIDAK dapat EXP)
+      // both days must have records (forgot to log -> NO EXP)
       if (cur && prev && cur.expense < prev.expense) {
         events.push({
           source: "DAILY_QUEST",
@@ -249,7 +249,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
     }
   }
 
-  /* ---- MINGGUAN ---- */
+  /* ---- WEEKLY ---- */
   if (weeklyRan) {
     for (let w = wFrom; w <= lastWeekDone; w = addDays(w, 7)) {
       let n = 0;
@@ -266,7 +266,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
     }
   }
 
-  /* ---- BULANAN ---- */
+  /* ---- MONTHLY ---- */
   if (monthlyRan) {
     const t = await totals(
       userId,
@@ -297,7 +297,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
     }
   }
 
-  /* ---- SIMPAN (atomic + advisory lock supaya tidak balapan) ---- */
+  /* ---- SAVE (atomic + advisory lock to prevent race conditions) ---- */
   return prisma.$transaction(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
@@ -363,8 +363,8 @@ export async function processUserProgress(userId: string, now = new Date()) {
           data: {
             userId,
             type: "SYSTEM",
-            title: `Naik ke Level ${level}! ${l.emoji}`,
-            body: `Kamu mendapat badge "${l.name}". Pertahankan kebiasaan hemat kamu!`,
+            title: `Level ${level} reached! ${l.emoji}`,
+            body: `You earned the "${l.name}" badge. Keep up your saving habits!`,
             data: { level },
           },
         });
@@ -377,7 +377,7 @@ export async function processUserProgress(userId: string, now = new Date()) {
 }
 
 /* =====================================================================
-   DATA UNTUK UI (dipanggil saat app dibuka; sekalian catch-up)
+   DATA FOR THE UI (called when the app opens; also performs catch-up)
    ===================================================================== */
 export async function getProgressSummary(userId: string) {
   await processUserProgress(userId);
@@ -388,7 +388,7 @@ export async function getProgressSummary(userId: string) {
   });
 
   const cur = LEVELS[p.level - 1];
-  const next = LEVELS[p.level] ?? null; // null = sudah max
+  const next = LEVELS[p.level] ?? null; // null = already max
   const progressPct = next
     ? Math.floor(((p.totalExp - cur.minExp) / (next.minExp - cur.minExp)) * 100)
     : 100;
@@ -407,10 +407,10 @@ export async function getProgressSummary(userId: string) {
 }
 
 /* =====================================================================
-   JOB TERJADWAL. Jalankan tiap jam di menit ke-1 (mis. node-cron):
+   SCHEDULED JOB. Run every hour at minute 1 (e.g. node-cron):
      cron.schedule("1 * * * *", runProgressJob);
-   Karena tiap user dihitung pakai timezone-nya sendiri, user WIB dapat EXP
-   tepat sekitar 00:01 WIB. Kalau server mati, job berikutnya otomatis catch-up.
+   Since each user is evaluated in their own timezone, WIB users get EXP
+   right around 00:01 WIB. If the server goes down, the next job catches up automatically.
    ===================================================================== */
 export async function runProgressJob() {
   let cursor: string | undefined;
@@ -435,18 +435,18 @@ export async function runProgressJob() {
 }
 
 /* =====================================================================
-   STATUS QUEST YANG SEDANG BERJALAN (untuk UI)
-   Hari ini & bulan ini masih berjalan, jadi hasilnya SEMENTARA.
-   EXP baru diberikan oleh processUserProgress setelah periodenya lewat.
+   STATUS OF CURRENTLY RUNNING QUESTS (for the UI)
+   Today & this month are still in progress, so results are TEMPORARY.
+   EXP is only granted by processUserProgress after the period has passed.
    ===================================================================== */
 export type QuestState =
-  | "NO_BASELINE" // pembanding (kemarin / bulan lalu) belum cukup tercatat
-  | "NEEDS_LOG" // belum ada catatan / catatan bulan ini tidak akan cukup
-  | "ON_TRACK" // pengeluaran masih di bawah pembanding
-  | "OVER" // sudah menyamai / melebihi pembanding
-  | "IN_PROGRESS" // quest pencatatan: masih berjalan
-  | "DONE" // quest pencatatan: target sudah tercapai (EXP menyusul saat periode lewat)
-  | "MISSED"; // quest pencatatan: sudah tidak mungkin tercapai
+  | "NO_BASELINE" // the comparison (yesterday / last month) isn't logged enough yet
+  | "NEEDS_LOG" // nothing logged yet / this month's logs won't be enough
+  | "ON_TRACK" // spending is still below the comparison
+  | "OVER" // already equal to or above the comparison
+  | "IN_PROGRESS" // logging quest: still running
+  | "DONE" // logging quest: target reached (EXP follows when the period ends)
+  | "MISSED"; // logging quest: can no longer be reached
 
 export type QuestId =
   | "DAILY_SAVE"
@@ -469,9 +469,9 @@ export type QuestDto = {
   target: number | null; // kind SAVE
   progress: number; // kind LOG
   goal: number; // kind LOG
-  loggedDays?: number; // khusus bulanan
+  loggedDays?: number; // monthly only
   requiredDays?: number;
-  daysLeft?: number; // bulanan: sisa hari bulan ini; mingguan: sisa hari minggu ini
+  daysLeft?: number; // monthly: days left this month; weekly: days left this week
 };
 
 export async function getQuestStatus(
@@ -495,7 +495,7 @@ export async function getQuestStatus(
     loggedPerDay(userId, tz, wStart, today),
   ]);
 
-  /* ---- hemat harian ---- */
+  /* ---- daily saving ---- */
   const dCur = days.get(today);
   const dPrev = days.get(yesterday);
   const dSpent = dCur?.expense ?? 0;
@@ -507,12 +507,12 @@ export async function getQuestStatus(
         ? "ON_TRACK"
         : "OVER";
 
-  /* ---- hemat bulanan ---- */
+  /* ---- monthly saving ---- */
   const mCur = months.get(month);
   const mPrev = months.get(prevMonth);
   const [y, mo] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-  const daysLeft = daysInMonth - Number(today.slice(8, 10)) + 1; // termasuk hari ini
+  const daysLeft = daysInMonth - Number(today.slice(8, 10)) + 1; // including today
   const logged = mCur?.days ?? 0;
   const mSpent = mCur?.expense ?? 0;
 
@@ -522,15 +522,15 @@ export async function getQuestStatus(
   else if (mSpent >= mPrev.expense) mState = "OVER";
   else mState = "ON_TRACK";
 
-  /* ---- pencatatan harian ---- */
+  /* ---- daily logging ---- */
   const todayLogs = logs.get(today) ?? 0;
   const logState = (goal: number): QuestState =>
     todayLogs >= goal ? "DONE" : "IN_PROGRESS";
 
-  /* ---- pencatatan mingguan ---- */
+  /* ---- weekly logging ---- */
   const weekDays = [...logs.values()].filter((n) => n > 0).length;
   const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
-  const weekDaysLeft = 7 - dow; // termasuk hari ini
+  const weekDaysLeft = 7 - dow; // including today
   const wState: QuestState =
     weekDays >= WEEKLY_LOG_DAYS
       ? "DONE"
@@ -546,8 +546,8 @@ export async function getQuestStatus(
       id: "DAILY_SAVE",
       type: "DAILY",
       kind: "SAVE",
-      title: "Hemat Harian",
-      subtitle: "Hemat dari kemarin",
+      title: "Daily Saving",
+      subtitle: "Spend less than yesterday",
       exp: DAILY_EXP,
       state: dState,
       spent: dSpent,
@@ -560,8 +560,8 @@ export async function getQuestStatus(
       id: "DAILY_LOG_1",
       type: "DAILY",
       kind: "LOG",
-      title: "Catat Transaksi",
-      subtitle: "Catat minimal 1 transaksi hari ini",
+      title: "Log a Transaction",
+      subtitle: "Log at least 1 transaction today",
       exp: LOG_1_EXP,
       state: logState(1),
       progress: Math.min(todayLogs, 1),
@@ -574,8 +574,8 @@ export async function getQuestStatus(
       id: "DAILY_LOG_3",
       type: "DAILY",
       kind: "LOG",
-      title: "Rajin Mencatat",
-      subtitle: "Catat minimal 3 transaksi hari ini",
+      title: "Diligent Logger",
+      subtitle: "Log at least 3 transactions today",
       exp: LOG_3_EXP,
       state: logState(3),
       progress: Math.min(todayLogs, 3),
@@ -588,8 +588,8 @@ export async function getQuestStatus(
       id: "WEEKLY_LOG",
       type: "WEEKLY",
       kind: "LOG",
-      title: "Konsisten Seminggu",
-      subtitle: `Catat transaksi ${WEEKLY_LOG_DAYS} dari 7 hari`,
+      title: "Consistent All Week",
+      subtitle: `Log transactions on ${WEEKLY_LOG_DAYS} of 7 days`,
       exp: WEEKLY_LOG_EXP,
       state: wState,
       progress: Math.min(weekDays, WEEKLY_LOG_DAYS),
@@ -603,8 +603,8 @@ export async function getQuestStatus(
       id: "MONTHLY_SAVE",
       type: "MONTHLY",
       kind: "SAVE",
-      title: "Hemat Bulanan",
-      subtitle: "Hemat dari bulan lalu",
+      title: "Monthly Saving",
+      subtitle: "Spend less than last month",
       exp: MONTHLY_EXP,
       state: mState,
       spent: mSpent,
@@ -619,7 +619,7 @@ export async function getQuestStatus(
 }
 
 /* =====================================================================
-   RIWAYAT EXP
+   EXP HISTORY
    ===================================================================== */
 export async function getExpHistory(userId: string, limit = 30) {
   const rows = await prisma.expEvent.findMany({

@@ -16,8 +16,8 @@ import { colors, radius, space } from "../lib/theme";
 import { Role, ROLE_LABEL } from "../lib/spaces";
 import { Button } from "./Button";
 import type { NativeSyntheticEvent, NativeScrollEvent } from "react-native";
-/* ---------- Dialog helpers (Alert.alert tidak berfungsi di web) ---------- */
-
+import { Ionicons } from "@expo/vector-icons";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 export function confirmAction(
   title: string,
   message: string,
@@ -51,9 +51,6 @@ export function showMessage(title: string, message: string) {
   Alert.alert(title, message);
 }
 
-/* ---------- Layout ---------- */
-
-/** Seberapa jauh lembar konten menimpa `header` (px). HeroHeader memakai ini untuk padding bawahnya. */
 export const SHEET_OVERLAP = 30;
 
 export function goBack() {
@@ -69,6 +66,7 @@ export function Screen({
   header,
   onScroll,
   padH,
+  footer,
 }: {
   children: ReactNode;
   refreshing?: boolean;
@@ -79,6 +77,7 @@ export function Screen({
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   /** Padding kiri-kanan kolom konten (default space.lg) */
   padH?: number;
+  footer?: ReactNode;
 }) {
   const columnStyle = [
     styles.column,
@@ -87,9 +86,10 @@ export function Screen({
 
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
         onScroll={onScroll}
         scrollEventThrottle={16}
         refreshControl={
@@ -97,7 +97,7 @@ export function Screen({
             <RefreshControl
               refreshing={!!refreshing}
               onRefresh={onRefresh}
-              tintColor={header ? "#FFFFFF" : colors.primary}
+              tintColor={colors.primary}
             />
           ) : undefined
         }
@@ -111,7 +111,12 @@ export function Screen({
         ) : (
           <View style={columnStyle}>{children}</View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
+      {footer ? (
+        <View style={styles.footer}>
+          <View style={styles.footerInner}>{footer}</View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -127,20 +132,26 @@ export function ScreenHeader({
 }) {
   return (
     <View style={styles.header}>
-      {back ? (
-        <Pressable
-          onPress={goBack}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Kembali"
-          style={styles.back}
-        >
-          <Text style={styles.backText}>‹ Kembali</Text>
-        </Pressable>
-      ) : null}
-      <Text style={styles.title} accessibilityRole="header">
-        {title}
-      </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerSide}>
+          {back ? (
+            <Pressable
+              onPress={goBack}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Kembali"
+              style={styles.back}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.ink} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
+          {title}
+        </Text>
+        {/* spacer selebar sisi kiri supaya judul benar-benar di tengah */}
+        <View style={styles.headerSide} />
+      </View>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
@@ -371,29 +382,54 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     marginTop: -SHEET_OVERLAP,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
   },
   column: {
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
     gap: space.md,
-    padding: space.lg,
+    paddingVertical: space.lg,
+    paddingHorizontal: 10,
   },
-
-  header: { gap: 4, marginBottom: space.sm },
-  back: { alignSelf: "flex-start", paddingVertical: 4, marginBottom: space.sm },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: "600" },
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    backgroundColor: colors.paper,
+  },
+  footerInner: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    paddingVertical: space.md,
+    paddingHorizontal: 10,
+  },
+  header: { gap: 2, marginBottom: space.sm },
+  headerRow: { flexDirection: "row", alignItems: "center" },
+  headerSide: { width: 36 },
+  back: {
+    width: 25,
+    height: 25,
+    marginLeft: -4, // ikon sejajar dengan tepi konten
+    alignItems: "center",
+    justifyContent: "center",
+  },
   title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: "700",
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
+    marginTop: -2,
     color: colors.ink,
-    letterSpacing: -0.3,
   },
-  subtitle: { fontSize: 16, lineHeight: 24, color: colors.muted },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -4,
+    color: colors.muted,
+    textAlign: "center",
+  },
 
   center: { paddingVertical: space.xl * 2, alignItems: "center" },
   errorBox: {
@@ -427,8 +463,8 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "500",
     color: colors.ink,
     marginTop: space.sm,
   },

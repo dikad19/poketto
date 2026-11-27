@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: colors.primary,
   },
   pill: {
     flexDirection: "row",
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 14,
     borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: colors.primary,
   },
   pillText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
 

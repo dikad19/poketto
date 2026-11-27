@@ -198,7 +198,7 @@ function IconButton({
       accessibilityLabel={badge ? `${label}, ${badge} baru` : label}
       style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
     >
-      <Ionicons name={icon} size={16} color="#FFFFFF" />
+      <Ionicons name={icon} size={19} color={colors.primaryLight} />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 9 ? "9+" : badge}</Text>
@@ -259,7 +259,7 @@ export function SpaceSwitcher() {
         accessibilityLabel={`Space aktif: ${active.name}. Ketuk untuk ganti.`}
         style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
       >
-        <Ionicons name="layers-outline" size={16} color="#FFFFFF" />
+        <Ionicons name="layers-outline" size={19} color={colors.primaryLight} />
       </Pressable>
 
       <BottomSheet
@@ -409,7 +409,10 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.surface,
   },
-  optionActive: { borderColor: colors.primary, backgroundColor: colors.paper },
+  optionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -429,13 +432,12 @@ const styles = StyleSheet.create({
   },
 
   iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
   },
+
   badge: {
     position: "absolute",
     top: -3,
@@ -446,9 +448,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.coin,
+    backgroundColor: colors.paper,
     borderWidth: 1.5,
-    borderColor: "#7A1D3A",
+    borderColor: colors.paper, // sebelumnya "#7A1D3A", supaya menyatu dengan latar header
   },
   switcher: {
     alignSelf: "flex-start",

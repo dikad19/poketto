@@ -1,0 +1,28 @@
+{
+  "common": { "cancel": "Cancel" },
+  "lock": {
+    "forgotTitle": "Forgot PIN?",
+    "forgotMessage": "You'll be logged out. After signing in again, you can create a new PIN by confirming your password.",
+    "logout": "Log out"
+  },
+  "account": {
+    "language": "Language",
+    "pendingInvites_one": "{{count}} invitation is waiting for your reply",
+    "pendingInvites_other": "{{count}} invitations are waiting for your reply",
+    "pendingInvitesHint": "Tap to view and respond.",
+    "mySpaces": "My spaces",
+    "noSpacesTitle": "No spaces yet",
+    "noSpacesBody": "Create a space to track finances together.",
+    "active": "active",
+    "members_one": "{{count}} member",
+    "members_other": "{{count}} members",
+    "useThisSpace": "Use this space",
+    "createSpace": "Create new space",
+    "myInvites": "My invitations",
+    "myInvitesCount": "My invitations ({{count}})",
+    "logout": "Log out"
+  },
+  "spaces": {
+    "types": {}
+  }
+}

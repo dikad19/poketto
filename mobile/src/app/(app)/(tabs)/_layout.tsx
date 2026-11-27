@@ -103,15 +103,7 @@ function AvatarTabItem({
       accessibilityState={{ selected: focused }}
       accessibilityLabel={label}
     >
-      <View
-        style={{
-          padding: 2,
-          borderRadius: 999,
-          borderWidth: 2,
-          borderColor: focused ? colors.primary : "transparent",
-          opacity: focused ? 1 : 0.8,
-        }}
-      >
+      <View style={{ opacity: focused ? 1 : 0.8 }}>
         <AvatarWithBorder
           avatarKey={u?.avatarKey}
           avatarUrl={u?.avatarUrl}

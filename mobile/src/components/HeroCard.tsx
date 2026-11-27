@@ -1,92 +1,21 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCompact, formatMoney } from "../lib/format";
 import { colors, radius, space } from "../lib/theme";
 import { SHEET_OVERLAP } from "./SpaceUI";
 import { Skeleton } from "./Skeleton";
-import Svg, {
-  Defs,
-  LinearGradient,
-  RadialGradient,
-  Rect,
-  Stop,
-} from "react-native-svg";
 
-const GOOD = "#A6F4C5";
-const BAD = "#FFD8A8";
-const SOFT = "rgba(255,255,255,0.78)";
-
-const GLOWS = [
-  { id: "glowLight", cx: 40, cy: 30, r: 300, color: "#9CBEF5", opacity: 0.6 },
-  {
-    id: "glowIndigo",
-    cx: 385,
-    cy: 60,
-    r: 230,
-    color: "#7B7CF2",
-    opacity: 0.42,
-  },
-  { id: "glowSky", cx: 395, cy: 260, r: 210, color: "#4F8FE0", opacity: 0.3 },
-  {
-    id: "glowCoin",
-    cx: 320,
-    cy: 440,
-    r: 240,
-    color: colors.coin,
-    opacity: 0.32,
-  },
-  { id: "glowDeep", cx: 10, cy: 450, r: 280, color: "#081426", opacity: 0.6 },
-];
+// Background is now light (colors.paper), so text/accents switched to dark tones
+const GOOD = "#027A48"; // darker green, readable on light
+const BAD = "#B54708"; // darker orange, readable on light
+const SOFT = colors.muted;
 
 export function HeroHeader({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const [size, setSize] = useState({ w: 0, h: 0 });
 
   return (
-    <View
-      style={styles.shell}
-      onLayout={(e) => {
-        const { width, height } = e.nativeEvent.layout;
-        setSize({ w: width, h: height });
-      }}
-    >
-      {size.w > 0 ? (
-        <Svg
-          style={StyleSheet.absoluteFill}
-          width={size.w}
-          height={size.h}
-          pointerEvents="none"
-        >
-          <Defs>
-            <LinearGradient id="heroBg" x1="0" y1="0" x2="0.7" y2="1">
-              <Stop offset="0" stopColor="#B03A5B" />
-              <Stop offset="0.5" stopColor="#7A1D3A" />
-              <Stop offset="1" stopColor="#3A0B1C" />
-            </LinearGradient>
-
-            <RadialGradient id="heroGlow" cx="0.15" cy="0.05" r="0.7">
-              <Stop offset="0" stopColor="#f16384" stopOpacity={0.22} />
-              <Stop offset="1" stopColor="#f16384" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width={size.w}
-            height={size.h}
-            fill="url(#heroBg)"
-          />
-          <Rect
-            x="0"
-            y="0"
-            width={size.w}
-            height={size.h}
-            fill="url(#heroGlow)"
-          />
-        </Svg>
-      ) : null}
-
+    <View style={styles.shell}>
       <View style={[styles.inner, { paddingTop: insets.top + space.md }]}>
         {children}
       </View>
@@ -270,7 +199,7 @@ const styles = StyleSheet.create({
   shell: {
     width: "100%",
     overflow: "hidden",
-    backgroundColor: "#7A1D3A",
+    backgroundColor: colors.paper,
   },
   inner: {
     width: "100%",
@@ -289,7 +218,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
     marginBottom: space.md,
     maxWidth: "100%",
   },
@@ -297,20 +228,20 @@ const styles = StyleSheet.create({
   pillValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.ink,
     flexShrink: 1,
   },
 
-  label: { fontSize: 14, color: "#fafafa" },
+  label: { fontSize: 14, color: SOFT },
   amount: {
     fontSize: 40,
     lineHeight: 48,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.ink,
     letterSpacing: -0.8,
     maxWidth: "100%",
   },
-  amountTail: { color: "rgba(255,255,255,0.5)" },
+  amountTail: { color: colors.muted },
   subtitle: {
     fontSize: 12,
     color: SOFT,
@@ -322,22 +253,24 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "stretch",
-    borderRadius: radius.field,
+    borderRadius: 6,
     paddingVertical: 14,
     paddingHorizontal: 6,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   stat: { flex: 1, alignItems: "center", gap: 2, paddingHorizontal: 6 },
   divider: {
     width: 1,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: colors.line,
     marginVertical: 2,
   },
   statLabel: { fontSize: 11, color: SOFT },
   statValue: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.ink,
     maxWidth: "100%",
   },
   statNote: {
